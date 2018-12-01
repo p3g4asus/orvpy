@@ -1,0 +1,188 @@
+1	Rai 1
+2	Rai 2
+3	Rai 3
+4	Rete 4
+5	Canale 5
+6	Italia 1
+7	LA7
+8	MTV8
+9	Deejay TV
+20	Retecapri
+21	Rai 4
+22	Iris
+23	Rai 5
+24	Rai Movie
+25	Rai Premium
+26	cielo
+27	Sky TG 24
+28	TV2000
+29	LA7d
+30	La 5
+31	Real Time
+32	QVC
+34	Mediaset Extra
+35	Mediaset Italia Due
+36	RTL 102.5 TV
+37	HSE24
+38	Giallo
+39	TOP Crime
+40	Boing
+41	K2
+42	Rai Gulp
+43	Rai yoyo
+44	frisbee
+45	Neko TV
+46	Cartoonito
+47	Super!
+48	Rai News 24
+49	Fine Living
+50	Sky TG 24 DFCTD
+51	TGCOM24
+52	DMAX
+54	Rai Storia
+55	Capri Gourmet
+56	Focus
+57	Rai Sport 1
+58	Rai Sport 2
+59	Split TV
+60	Sportitalia
+61	Sport 1
+62	Nuvolari
+63	Winga TV
+64	SuperTennis
+66	Radio Capri TelevisiON
+67	MTV Music
+69	Onda Italiana
+70	Radio Italia TV
+75	TLC Telecampione
+107	LA7
+108	MTV8
+109	Deejay TV +1
+120	Retecapri 2
+122	Capri Store
+123	Italia Channel
+128	Gold TV Italia
+129	La 4 Italia
+130	Channel24
+131	Rete Italia
+132	Italia +
+133	Juwelo
+137	Vero
+138	Air Italia
+140	Linea Italia
+145	Padre Pio TV
+146	Rai Scuola
+147	SOS Television
+149	Capri Casinò
+153	Sportitalia
+158	m2o Tv
+162	Radio Capital TiVù
+163	OK Italia TV1
+166	Mediatext.it
+177	Odeon24
+229	LA7d
+234	Entertainment Fact
+237	Air TV
+247	Capri Fashion
+251	Pianeta TV
+267	MTV Music
+300	Premium Menu
+311	Premium Action HD
+312	Premium Action +24
+313	Premium Crime HD
+314	Premium Crime +24
+315	Joi
+316	Premium Stories
+320	Discovery World
+321	BBC Knowledge
+330	Premium Cinema HD
+331	Premium Cinema +24
+332	Premium Cinema 2 HD
+333	Premium Cinema 2 +24
+334	Premium Cinema Energy
+335	Premium Cinema Emotion
+336	Premium Cinema Comedy
+337	Studio Universal
+350	Disney Channel
+351	Disney Channel +1
+352	Disney Junior
+353	Cartoon Network
+370	Premium Sport
+371	Premium Calcio
+372	Eurosport
+373	Eurosport 2
+380	Premium Sport HD
+381	Premium Calcio HD
+382	Premium Calcio 1
+383	Premium Calcio 2
+384	Premium Calcio 3
+385	Premium Calcio 4
+386	Premium Calcio 5
+387	Premium Calcio 6
+388	Premium Calcio 7
+390	Premium Calcio 1 HD
+452	Luci Rosse TV 1
+453	Luci Rosse TV 2
+454	Luci Rosse TV 3 Promo
+501	Rai HD
+504	Rete4 HD
+505	Canale5 HD
+506	Italia1 HD
+507	LA7
+508	MTV8
+520	RetecapriHD
+529	LA7d
+557	Rai Sport 1 HD
+567	MTV Music
+33	Agon Channel
+53	Italia 53
+65	Acqua
+68	Play.me
+76	La 9
+77	Canale 77
+78	Canale 78
+81	La 8
+83	Canale Italia 83
+84	Canale Italia 84
+121	Italia 121
+124	Telemarket
+125	Telemarket for you
+126	Italia 126
+127	Italia 127
+134	Canale Italia Musica
+135	Italia 135
+136	Italia 136
+138	Air Italia
+139	Prontogold TV1
+140	Linea Italia
+141	France 24
+142	Italia 142
+143	Canale Italia
+144	Vero Lady
+148	Class Horse TV
+150	Canale Italia 5
+151	La9 Italia
+152	Canale Italia 6
+154	Canale Italia 3
+155	DTV
+156	Italia 156
+159	Italia 159
+160	Italia 160
+161	Cantando Ballando
+164	TV Italia
+165	iTV Italia
+167	R101 TV
+168	Arte Moda
+169	Donna Italia
+170	OK Italia TV2
+176	Quadrifoglio Tv
+179	Italia TV
+180	TG Norba 24
+225	OK Italia TV3
+236	TOP Italia
+282	Canale Italia 2
+283	Serenissima
+284	Canale Italia 4
+401	Nitegate Promo
+402	Nitegate 1
+403	Nitegate 2

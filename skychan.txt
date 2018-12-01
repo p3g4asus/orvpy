@@ -1,0 +1,325 @@
+100	Sky TG 24 HD
+100	Sky TG 24 Active
+101	Rai 1
+102	Rai 2
+103	Rai 3
+105	Sky Uno HD
+106	Fox HD
+107	LA7
+108	Sky Uno HD
+109	Sky Uno +1 HD
+110	Sky Atlantic HD
+112	Fox HD
+113	Fox +1
+114	Fox Life HD
+115	Fox Life +1
+116	Fox Crime HD
+117	Fox Crime +1
+121	MTV8 HD
+122	AXN HD
+123	AXN +1
+124	Comedy Central
+125	Comedy Central +1
+126	Cielo HD
+127	Fox Animation HD
+128	Fox Comedy HD
+129	Lei
+130	Lei +1
+131	Real Time HD
+132	Real Time +1
+133	MTV Next HD
+134	AXN Sci-Fi
+136	DMAX HD
+137	DMAX +1
+139	La EFFE
+140	TV2000
+143	Fox Crime +2
+144	Giallo
+145	Deejay TV
+148	AutomotoTV
+149	Man-ga
+150	Sky 3D
+163	La3
+180	Class TV Moda
+181	Sky TG 24
+182	Sky Uno
+183	Sky Uno +1
+184	Sky Atlantic
+185	Fox
+186	Fox Life
+187	Fox Crime
+190	MTV8
+191	AXN
+193	Cielo
+194	Fox Animation
+195	Fox Comedy
+196	Real Time
+197	MTV Next
+198	DMAX
+200	Sky Sport 24 HD
+201	Sky Sport 1 HD
+202	Sky Sport 2 HD
+203	Sky Sport 3 HD
+204	Fox Sports HD
+205	Sky Sport Plus HD
+206	Sky Supercalcio HD
+207	Sky Sport F1 HD
+208	Sky Sport MotoGP HD
+210	Eurosport HD
+211	Eurosport 2 HD
+215	Sky 3D
+220	UnireSat
+221	ClassHorseTV
+222	POKERItalia24
+225	Sportitalia
+227	Rai Sport 1
+228	Rai Sport 2
+230	Milan Channel
+232	Inter Channel
+233	Lazio Style Channel
+235	CACCIA e Pesca
+236	Caccia e PESCA
+240	Sky Sport 24
+241	Sky Sport 1
+242	Sky Sport 2
+243	Sky Sport 3
+244	Sky Sport Plus
+245	Sky Supercalcio
+246	Sky Sport F1
+247	Sky Sport MotoGP
+265	Fox Sports
+267	Eurosport
+268	Eurosport 2
+248	Sky Calcio Info
+249	Sky Supercalcio HD
+250	Sky Sport 24 HD
+251	Sky Calcio 1 HD
+252	Sky Calcio 2 HD
+253	Sky Calcio 3 HD
+254	Sky Calcio 4 HD
+255	Sky Calcio 5 HD
+256	Sky Calcio 6 HD
+257	Sky Calcio 7 HD
+258	Sky Calcio 8 HD
+259	Sky Calcio 9
+260	Sky Calcio 10
+261	Sky Calcio 11
+262	Sky Calcio 12
+263	Sky Calcio 13
+271	Sky Calcio 1
+272	Sky Calcio 2
+273	Sky Calcio 3
+274	Sky Calcio 4
+275	Sky Calcio 5
+276	Sky Calcio 6
+277	Sky Calcio 7
+278	Sky Calcio 8
+300	Mosaico Cinema
+301	Sky Cinema 1 HD
+302	Sky Cinema +1 HD
+303	Sky Cinema +24 HD
+304	Sky Cinema Hits HD
+306	Sky Cinema Family HD
+308	Sky Cinema Passion HD
+310	Sky Cinema Comedy HD
+312	Sky Cinema Max HD
+313	Sky Cinema Max +1 HD
+314	Sky Cinema Cult HD
+315	Sky Cinema Classics HD
+321	Sky 3D
+331	Sky Cinema 1
+332	Sky Cinema +1
+333	Sky Cinema +24
+334	Sky Cinema Hits
+336	Sky Cinema Family
+338	Sky Cinema Passion
+340	Sky Cinema Comedy
+342	Sky Cinema Max
+343	Sky Cinema Max +1
+344	Sky Cinema Cult
+345	Sky Cinema Classics
+350	Vetrina Primafila
+351	Sky Primafila 1 HD
+352	Sky Primafila 2
+353	Sky Primafila 3 HD
+354	Sky Primafila 4
+355	Sky Primafila 5 HD
+356	Sky Primafila 6
+357	Sky Primafila 7 HD
+358	Sky Primafila 8
+359	Sky Primafila 9 HD
+360	Sky Primafila 10
+361	Sky Primafila 11 HD
+362	Sky Primafila 12
+363	Sky Primafila 13 HD
+364	Sky Primafila 14
+365	Sky Primafila 15
+366	Sky Primafila 16
+367	Sky Primafila 17
+368	Sky Primafila 18
+369	Sky Primafila 19
+370	Sky Primafila 20
+371	Sky Primafila 21
+372	Sky Primafila 22
+373	Sky Primafila 23
+374	Sky Primafila 24
+375	Sky Primafila 25
+376	Sky Primafila 26
+377	Sky Primafila 27
+378	Sky Primafila 28
+399	Vetrina Primafila
+401	Discovery Channel HD
+402	Discovery Channel +1
+403	National Geographic Channel HD
+404	National Geographic Channel +1
+405	Discovery Science HD
+406	Discovery Travel & Living HD
+407	History HD
+408	History +1
+409	Nat Geo Wild HD
+410	Nat Geo Wild +1
+412	Gambero Rosso Channel HD
+413	Dove TV
+416	Animal Planet
+418	Focus
+440	Doctor's Life Channel
+451	Discovery Channel
+452	National Geographic Channel
+455	Discovery Science
+456	Discovery Travel & Living
+457	History
+459	Nat Geo Wild
+461	Gambero Rosso Channel
+475	QVC
+489	Fashion TV
+492	arte
+500	Sky TG 24 HD
+500	Sky TG 24 Active
+501	Sky Meteo 24
+501	Sky Meteo 24 Active
+502	Sky Sport 24 HD
+503	Sky TG 24 Primo Piano
+504	Sky TG 24 Eventi
+505	Sky TG 24 Rassegne
+507	Class CNBC
+508	RaiNews24
+509	TGcom24
+510	TG Norba 24
+512	Reteconomy
+518	Romauno
+519	TRM h24
+520	San Marino RTV
+521	Euronews
+522	Sky News
+523	Fox News Channel
+524	Camera dei deputati
+525	Senato della Repubblica
+526	CNN International
+527	Fox Business Network
+528	CNBC Europe
+529	Bloomberg Television
+530	BBC World News
+531	France 24 English
+532	Al Jazeera Intl
+533	NHK World
+534	Arirang TV
+535	CCTV-9 Documentary
+536	Russia Today
+537	i24news
+540	TeleSUR
+541	France 24
+542	TV5 Europe
+543	Deutsche Welle
+545	Das Erste
+548	BVN
+552	Telewizja Polonia
+558	TVR International
+560	Al Jazeera
+561	Al Arabiya
+562	BBC Arabic
+564	TRT Türk
+565	2M Monde
+566	Medi 1 Sat
+569	Télévision Tunisienne 1
+570	Canal Algérie
+575	Rossija 24
+576	RTR Planeta
+577	Channel 1
+578	RT Documentary HD
+580	CCTV-4
+600	Mosaico Bambini
+601	DeA Kids
+602	DeA Kids +1
+603	Nick Jr.
+604	Nick Jr. +1
+605	Nickelodeon
+606	Nickelodeon +1
+607	Cartoon Network
+608	Cartoon Network +1
+609	Boomerang
+610	Boomerang +1
+611	Disney Junior
+612	Disney Junior +1
+613	Disney Channel HD
+614	Disney Channel +1
+615	Disney Channel +2
+616	Disney XD HD
+617	Disney XD +1
+618	Disney XD +2
+619	Disney In English
+620	TeenNick
+623	DeA Junior
+624	BabyTV
+625	Super!
+626	K2
+627	Frisbee
+673	Disney Channel
+676	Disney XD
+690	JeemTV
+691	Baraem
+700	Sky Radio
+701	Sky Music
+704	MTV Hits
+706	MTV Rocks
+708	MTV Music
+713	Radio Capital TiVù
+714	myDeejay
+718	Rock TV
+720	Hip Hop TV
+725	Radio Italia TV
+730	Radionorba TV
+750	RTL 102.5 TV
+804	Ada Channel
+805	Rai Storia
+806	Rai Scuola
+807	Rai Gulp
+811	Italian Fishing TV
+812	UniNettuno University TV
+813	TG Architettura
+819	Julie News
+820	Città Italia Sport
+821	Canale Italia
+825	People TV – Rete 7
+832	TVA Vicenza
+835	AB Channel
+845	iTV Italia
+850	Sonlife Broadcasting Network
+851	Daystar Television Network
+852	Padre Pio TV
+861	Starmarket
+863	Elite Shopping
+864	Juwelo
+866	Cagnola
+870	HSE24
+871	Antichità Chiossone
+877	La 9
+880	90numeriSat
+883	Pianeta TV
+887	Tele Akery
+891	Prima Free
+908	Lombardia Sat
+909	New Television
+913	Canale Italia 83
+918	Artetivù
+937	Canale Italia 84
+952	Eurotic TV

@@ -1,0 +1,39 @@
+<?xml version="1.0" ?>
+<devices>
+  <device host="192.168.25.41" mac="accf23725a50" mytime="30/01/2016 11:39:27" name="orvibo1" rtime="60" sec1900="3663142767" sst="1454154677" type="DeviceAllOne">
+    <tables>
+      <table num="4">
+        <version>4</version>
+        <flag>4</flag>
+      </table>
+    </tables>
+    <offafteron>0</offafteron>
+    <timezone>1</timezone>
+    <timers>
+      <timer>
+        <code>2</code>
+        <rep value="0"/>
+        <action>sony:green</action>
+        <date>01/02/2016 08:08:00</date>
+      </timer>
+      <timer>
+        <code>3</code>
+        <rep value="0"/>
+        <action>sony:green</action>
+        <date>01/02/2018 08:08:00</date>
+      </timer>
+      <timer>
+        <code>1</code>
+        <rep value="129">Mon</rep>
+        <action>@2sky</action>
+        <date>29/02/2016 00:00:00</date>
+      </timer>
+    </timers>
+  </device>
+  <device host="192.168.25.42" mac="accf2393349c" mytime="17/01/2016 23:27:51" name="s201" rtime="60" sec1900="3662062071" sst="1453073259" type="DeviceS20">
+    <tables/>
+    <offafteron>70000</offafteron>
+    <timezone>70000</timezone>
+    <timers/>
+  </device>
+</devices>

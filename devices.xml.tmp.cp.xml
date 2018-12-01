@@ -1,0 +1,28 @@
+<?xml version="1.0" ?>
+<devices>
+  <device host="192.168.25.147" mac="accf232a5ffa" name="pprim" rtime="60" sst="1452106985" type="DeviceAllOne">
+    <tables/>
+    <offafteron>70000</offafteron>
+    <timezone>70000</timezone>
+    <timers/>
+  </device>
+  <device host="192.168.25.147" mac="accf232419c0" name="Office" rtime="60" sst="1452366189" type="DeviceS20">
+    <tables/>
+    <offafteron>70000</offafteron>
+    <timezone>70000</timezone>
+    <timers>
+      <timer>
+        <code>1</code>
+        <rep value="255">Mon,Tue,Wed,Thu,Fri,Sat,Sun</rep>
+        <action>1</action>
+        <date>23/05/2014 16:00:00</date>
+      </timer>
+      <timer>
+        <code>2</code>
+        <rep value="255">Mon,Tue,Wed,Thu,Fri,Sat</rep>
+        <action>0</action>
+        <date>13/07/2014 19:00:00</date>
+      </timer>
+    </timers>
+  </device>
+</devices>
