@@ -2351,16 +2351,21 @@ class DevicePrimelan(Device):
             
 class DeviceRM(IrManager,ManTimerManager):
     
+    def inner_init(self):
+        try:
+            self.inner = broadlink.rm((self.host,self.port),bytearray(self.mac))
+            if not self.inner.auth():
+                self.inner = None
+        except:
+            traceback.print_exc()
+            self.inner = None
+            
+    
     def __init__(self,hp = ('',0),mac = '',root = None,name = '',inner = None):
         Device.__init__(self,hp,mac,root,name)
         ManTimerManager.__init__(self, root)
         IrManager.__init__(self,hp,mac,root,name)
-        if inner is None:
-            self.inner = broadlink.rm((self.host,self.port),bytearray(self.mac))
-            if not self.inner.auth():
-                self.inner = None
-        else:
-            self.inner = inner
+        self.inner = inner
         
     def get_arduraw(self,remote,irdata):
         return {'key':irdata[1],'remote':remote,'a':lircbroadlink.broadlink2lirc(irdata[0])};
@@ -2371,25 +2376,40 @@ class DeviceRM(IrManager,ManTimerManager):
     def send_action(self, actionexec, action, pay):
         mac = self.mac.encode('hex')
         if self.inner is None:
-            return action.handler(self.inner.host,\
-                dict(rv=None,uid=mac,cmd=25 if isinstance(action, ActionLearnir) else 15))
+            self.inner_init()
+            if self.inner is None:
+                return action.handler(self.host,\
+                    dict(rv=None,uid=mac,cmd=25 if isinstance(action, ActionLearnir) else 15))
         timeout = action.get_timeout()
         if timeout is None or timeout<0:
             timeout = actionexec.udpmanager.timeout
         if timeout<0:
             timeout = None
         self.inner.timeout = timeout
-        if isinstance(action, ActionLearnir):
-            response = self.inner.enter_learning()
-            return action.handler(self.inner.host,\
-                                  dict(rv=None,uid=mac,cmd=25) if response is None else 
-                                  dict(rv=response[0x22] | (response[0x23] << 8),uid=mac,cmd=116))
-        else:
-            print ("S(%s:%d)->" % self.inner.host)+pay.encode('hex')
-            response = self.inner.send_data(pay)
-            return action.handler(self.inner.host,\
-                                  dict(rv=None if response is None else response[0x22] | (response[0x23] << 8),\
-                                       uid=mac,cmd=15))
+        try:
+            if isinstance(action, ActionLearnir):
+                cmd = 25
+                response = self.inner.enter_learning()
+                if response is None:
+                    rv = None
+                else:
+                    rv=response[0x22] | (response[0x23] << 8)
+                    cmd = 116
+            else:
+                cmd = 15
+                print ("S(%s:%d)->" % self.inner.host)+pay.encode('hex')
+                response = self.inner.send_data(pay)
+                if response is None:
+                    rv = None
+                else:
+                    rv=response[0x22] | (response[0x23] << 8)
+        except:
+            traceback.print_exc()
+            rv = None
+        if rv is None or rv!=0:
+            #Forzo futura riconnessione
+            self.inner = None
+        return action.handler(self.inner.host,dict(rv=rv,uid=mac,cmd=cmd))
 
     def copy_extra_from(self,already_saved_device):
         savep = self.port

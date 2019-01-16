@@ -208,6 +208,9 @@ class device:
     payload[0x36] = ord('1')
 
     response = self.send_packet(0x65, payload)
+    
+    if not response:
+     return False
 
     payload = self.decrypt(response[0x38:])
 
