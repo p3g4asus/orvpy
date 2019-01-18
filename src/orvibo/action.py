@@ -2406,10 +2406,11 @@ class DeviceRM(IrManager,ManTimerManager):
         except:
             traceback.print_exc()
             rv = None
+        host = self.inner.host
         if rv is None or rv!=0:
             #Forzo futura riconnessione
             self.inner = None
-        return action.handler(self.inner.host,dict(rv=rv,uid=mac,cmd=cmd))
+        return action.handler(host,dict(rv=rv,uid=mac,cmd=cmd))
 
     def copy_extra_from(self,already_saved_device):
         savep = self.port
