@@ -2409,6 +2409,7 @@ class DeviceRM(IrManager,ManTimerManager):
         host = self.inner.host
         if rv is None or rv!=0:
             #Forzo futura riconnessione
+            print("Blackbeam %s error: will try to reconnect" % self.name)
             self.inner = None
         return action.handler(host,dict(rv=rv,uid=mac,cmd=cmd))
 
