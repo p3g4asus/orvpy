@@ -4,6 +4,7 @@ Created on 01 gen 2016
 @author: Matteo
 '''
 import socket
+import urlparse
 import threading
 import time
 import orvibo.event as event
@@ -11,6 +12,7 @@ import struct
 from xml.etree.ElementTree import Element, SubElement
 from xml.etree import ElementTree
 from xml.dom import minidom
+from xml.sax.saxutils import escape
 from random import randint
 import traceback
 from datetime import datetime,date,timedelta
@@ -30,6 +32,7 @@ import urllib
 import SocketServer
 import select
 import SimpleHTTPServer
+import upnpclient
 
 
 def _default(self, obj):
@@ -1742,6 +1745,12 @@ class IrManager(Device):
         if self.backuptimer:
             self.backuptimer.cancel()
             self.backuptimer = None
+    
+    def get_dir(self,rem,key):
+        if rem in self.dir and key in self.dir[rem]:
+            return self.dir[rem][key]
+        else:
+            return []
             
     def get_arduraw(self,remote,irdata):
         return {}
@@ -2136,7 +2145,596 @@ class DeviceVirtual(Device):
         else:
             rv = None
         return action.handler((self.host,self.port),dict(rv=rv,uid=mac))
+
+class DeviceUpnp(Device):
+    
+    @staticmethod
+    def correct_upnp_name(name):
+        return name.replace('/',' ').\
+            replace('\\',' ').\
+            replace('-',' ').\
+            replace('_',' ').\
+            replace('[','').\
+            replace(']',' ').\
+            replace('(',' ').\
+            replace(')',' ')
+    
+    def __init__(self,hp = ('',0),mac = '',root = None,name = '',location='',deviceobj = None):
+        Device.__init__(self,hp,mac,root,name)
+        self.upnp_obj = deviceobj
+        if root is None:
+            self.upnp_location = location
+        else:
+            self.upnp_location = root.attributes['upnp_location'].value
             
+    def init_device(self):
+        if self.upnp_obj is None:
+            try:
+                self.upnp_obj = upnpclient.Device(self.upnp_location,self.name)
+            except:
+                traceback.print_exc()
+                self.upnp_obj = None
+        return self.upnp_obj
+        
+            
+    def to_dict(self):
+        rv = Device.to_dict(self)
+        rv.update({'upnp_location':self.upnp_location})
+        return rv
+    
+    
+    @staticmethod
+    def get_name(d):
+        if len(d.friendly_name):
+            rv = d.friendly_name
+        elif len(d.model_name):
+            rv = d.model_name
+        elif len(d.model_description):
+            rv = d.model_description
+        else:
+            rv = d.location
+        return DeviceUpnp.correct_upnp_name(rv)
+        
+    @staticmethod
+    def discover(timeout=5):
+        out = {}
+        try:
+            print("Searching upnp devices")
+            devs = upnpclient.discover(timeout=5)
+            print("Found "+str(len(devs))+" upnp devices")
+            rc = {"RenderingControl":{},"MainTVAgent2":{}}
+            for d in devs:
+                u = urlparse.urlparse(d.location)
+                for k in rc.keys():
+                    if k in d.service_map:
+                        print("Found "+k+" at "+d.location)
+                        rc[k]['{}:{}'.format(u.hostname,u.port)] = d
+            for k,v in rc["MainTVAgent2"].iteritems():
+                drc = None
+                u = urlparse.urlparse(v.location)
+                hp = (u.hostname,u.port)
+                if k in rc["RenderingControl"]:
+                    d = rc["RenderingControl"][k]
+                    drc = DeviceUpnpIRRC(hp = hp,\
+                             mac=d.udn,\
+                             name=DeviceUpnp.get_name(d),\
+                             location=d.location,\
+                             deviceobj=d)
+                    del rc["RenderingControl"][k]
+                out['{}:{}:'.format(*hp)+v.udn] = \
+                    DeviceUpnpIRTA2(hp = hp,\
+                             mac=v.udn,\
+                             name=DeviceUpnp.get_name(v),\
+                             location=v.location,
+                             deviceobj=v,\
+                             rcloc='' if drc is None else drc.upnp_location,
+                             rc=drc)
+            for k,v in rc["RenderingControl"].iteritems():
+                u = urlparse.urlparse(v.location)
+                hp = (u.hostname,u.port)
+                out['{}:{}:'.format(*hp)+v.udn] = \
+                    DeviceUpnpIRRC(hp = hp,\
+                             mac=v.udn,\
+                             name=DeviceUpnp.get_name(v),\
+                             location=v.location,
+                             deviceobj=v)
+        except:
+            traceback.print_exc()
+        return out
+            
+class ContextException(Exception):
+    """An Exception class with context attached to it, so a caller can catch a
+    (subclass of) ContextException, add some context with the exception's
+    add_context method, and rethrow it to another callee who might again add
+    information."""
+
+    def __init__(self, msg, context=[]):
+        self.msg     = msg
+        self.context = list(context)
+
+    def __str__(self):
+        if self.context:
+            return '%s [context: %s]' % (self.msg, '; '.join(self.context))
+        else:
+            return self.msg
+
+    def add_context(self, context):
+        self.context.append(context)
+
+
+class ParseException(ContextException):
+    """An Exception for when something went wrong parsing the channel list."""
+    pass
+
+def _getint(buf, offset):
+    """Helper function to extract a 16-bit little-endian unsigned from a char
+    buffer 'buf' at offset 'offset'..'offset'+2."""
+    x = struct.unpack('<H', buf[offset:offset+2])
+    return x[0]
+
+class Channel(object):
+    """Class representing a Channel from the TV's channel list."""
+
+    def __init__(self, from_dat):
+        """Constructs the Channel object from a binary channel list chunk."""
+
+        self._parse_dat(from_dat)
+
+    def _parse_dat(self, buf):
+        """Parses the binary data from a channel list chunk and initilizes the
+        member variables."""
+
+        # Each entry consists of (all integers are 16-bit little-endian unsigned):
+        #   [2 bytes int] Type of the channel. I've only seen 3 and 4, meaning
+        #                 CDTV (Cable Digital TV, I guess) or CATV (Cable Analog
+        #                 TV) respectively as argument for <ChType>
+        #   [2 bytes int] Major channel (<MajorCh>)
+        #   [2 bytes int] Minor channel (<MinorCh>)
+        #   [2 bytes int] PTC (Physical Transmission Channel?), <PTC>
+        #   [2 bytes int] Program Number (in the mux'ed MPEG or so?), <ProgNum>
+        #   [2 bytes int] They've always been 0xffff for me, so I'm just assuming
+        #                 they have to be :)
+        #   [4 bytes string, \0-padded] The (usually 3-digit, for me) channel number
+        #                               that's displayed (and which you can enter), in ASCII
+        #   [2 bytes int] Length of the channel title
+        #   [106 bytes string, \0-padded] The channel title, in UTF-8 (wow)
+
+        t = _getint(buf, 0)
+        if t == 4:
+            self.ch_type = 'CDTV'
+        elif t == 3:
+            self.ch_type = 'CATV'
+        elif t == 2:
+            self.ch_type = 'DTV'
+        else:
+            raise ParseException('Unknown channel type %d' % t)
+
+        self.major_ch = _getint(buf, 2)
+        self.minor_ch = _getint(buf, 4)
+        self.ptc      = _getint(buf, 6)
+        self.prog_num = _getint(buf, 8)
+
+        if _getint(buf, 10) != 0xffff:
+            raise ParseException('reserved field mismatch (%04x)' % _getint(buf, 10))
+
+        self.dispno = buf[12:16].rstrip('\x00')
+
+        title_len = _getint(buf, 22)
+        self.title = buf[24:24+title_len].decode('utf-8')
+
+    def display_string(self):
+        """Returns a unicode display string, since both __repr__ and __str__ convert it
+        to ascii."""
+
+        return u'[%s] % 4s %s' % (self.ch_type, self.dispno, self.title)
+
+    def __repr__(self):
+        # return self.as_xml
+        return '<Channel %s %s ChType=%s MajorCh=%d MinorCh=%d PTC=%d ProgNum=%d>' % \
+            (self.dispno, repr(self.title), self.ch_type, self.major_ch, self.minor_ch, self.ptc,
+             self.prog_num)
+
+    @property
+    def as_xml(self):
+        """The channel list as XML representation for SetMainTVChannel."""
+
+        return ('<?xml version="1.0" encoding="UTF-8" ?><Channel><ChType>%s</ChType><MajorCh>%d'
+                '</MajorCh><MinorCh>%d</MinorCh><PTC>%d</PTC><ProgNum>%d</ProgNum></Channel>') % \
+            (escape(self.ch_type), self.major_ch, self.minor_ch, self.ptc, self.prog_num)
+            
+    def as_params(self,chtype,sid):
+        return {'ChannelListType':chtype,'Channel':self.as_xml,'SatelliteID':sid}
+            
+class Source(object):
+    def __init__(self,root):
+        name = root.getElementsByTagName('SourceType')
+        sid = root.getElementsByTagName('ID')
+        self.sname = name[0].childNodes[0].nodeValue
+        self.sid = int(sid[0].childNodes[0].nodeValue)
+    
+    def as_params(self):
+        return {'Source':self.sname,'ID':self.sid,'UiID':self.sid}
+    
+class DeviceUpnpIR(DeviceUpnp,IrManager,ManTimerManager):
+    NUMBER_KEY = "1"
+    SOURCE_KEY = "0"
+    RC_KEY = "2"
+    def __init__(self,hp = ('',0),mac = '',root = None,name = '',location='',deviceobj = None):
+        DeviceUpnp.__init__(self,hp,mac,root,name,location,deviceobj)
+        ManTimerManager.__init__(self, root)
+        IrManager.__init__(self,hp,mac,root,name)
+        self.a = None
+        
+    def ir_decode(self,irc):
+        return irc
+    
+    def get_remote_name(self):
+        if len(self.dir):
+            return next(iter(self.dir.keys()))
+        else:
+            return DeviceUpnp.correct_upnp_name(self.name)
+
+    def ir_encode(self,irc):
+        return irc
+        
+    def copy_extra_from(self,already_saved_device):
+        DeviceUpnp.copy_extra_from(self,already_saved_device)
+        IrManager.copy_extra_from(self,already_saved_device)
+        ManTimerManager.copy_extra_from(self,already_saved_device)
+
+    def xml_element(self,root,flag = 0):
+        el = IrManager.xml_element(self, root, flag)
+        ManTimerManager.xml_element(self, el, flag)
+        return el
+
+    def on_stop(self):
+        IrManager.on_stop(self)
+        ManTimerManager.on_stop(self)    
+    
+    def to_json(self):
+        rv = DeviceUpnp.to_json(self)
+        rv.update(IrManager.to_json(self))
+        rv.update(ManTimerManager.to_json(self))
+        return rv        
+    
+class DeviceUpnpIRTA2(DeviceUpnpIR):
+    def __init__(self,hp = ('',0),mac = '',root = None,name = '',location='',deviceobj = None,rcloc = '',rc = None):
+        DeviceUpnpIR.__init__(self,hp,mac,root,name,location,deviceobj)
+        self.upnp_drc_dev = rc
+        self.channel_list_type = None
+        self.channel_satellite_id = None
+        self.channels = None
+        self.sources = None
+        if root is None:
+            self.upnp_drc_location = rcloc
+        else:
+            self.upnp_drc_location = root.attributes['upnp_drc_location'].value
+            
+        #print("LOC "+self.upnp_drc_location)
+        if deviceobj is not None:
+            self.init_device()
+            
+    def get_remote_name(self):
+        if self.upnp_drc_dev is not None:
+            return self.upnp_drc_dev.get_remote_name()
+        else:
+            return DeviceUpnpIR.get_remote_name(self)
+    
+    def get_dir(self,rem,key):
+        if self.init_device():
+            if rem in self.dir:
+                if key in self.dir[rem]:
+                    return self.dir[rem][key]
+                else:
+                    #print("JJJ "+key+" "+str(self.upnp_drc_dev.dir))
+                    if self.upnp_drc_dev and len(self.upnp_drc_dev.dir):
+                        rv = self.upnp_drc_dev.get_dir(self.upnp_drc_dev.dir.keys()[0], key)
+                        if rv:
+                            return rv
+                    mo = re.search("^([0-9]+)$", key)
+                    if mo is not None:
+                        return (key,'',{"type":DeviceUpnpIR.NUMBER_KEY})
+        return []
+        
+            
+    def to_dict(self):
+        rv = DeviceUpnpIR.to_dict(self)
+        rv.update({'upnp_drc_location':self.upnp_drc_location})
+        return rv
+    
+    def init_device(self):
+        if self.upnp_obj is None or self.a is None or len(self.dir)==0 or len(self.sources)==0:
+            rv = DeviceUpnpIR.init_device(self)
+            if rv:
+                if self.upnp_drc_dev is None:
+                    if len(self.upnp_drc_location):
+                        try:
+                            #print("QQQ Going "+self.upnp_drc_location)
+                            upnp_drc_obj = upnpclient.Device(self.upnp_drc_location)
+                            u = urlparse.urlparse(self.upnp_drc_location)
+                            hp = (u.hostname,u.port)
+                            self.upnp_drc_dev = DeviceUpnpIRRC(hp = hp,\
+                                         mac=self.mac,\
+                                         name=DeviceUpnp.get_name(upnp_drc_obj),\
+                                         location=upnp_drc_obj.location,
+                                         deviceobj=upnp_drc_obj)
+                        except:
+                            traceback.print_exc()
+                            self.upnp_drc_dev = None
+                else:
+                    self.upnp_drc_dev.mac = self.mac
+                    self.upnp_drc_dev.get_states()
+                try:
+                    self.a = rv.service_map['MainTVAgent2'].action_map
+                    self.get_channels_list()
+                    self.get_sources_list()
+                    self.fill_ir_list()
+                except:
+                    traceback.print_exc();
+                    self.upnp_obj = None
+                
+        return self.upnp_obj
+    
+    def fill_ir_list(self):
+        dc = dict() 
+        for i in xrange(10):
+            dc[str(i)] = (str(i),str(i),{"type":DeviceUpnpIR.NUMBER_KEY})
+        for s in self.sources.keys():
+            dc[s] = (s,s,{"type":DeviceUpnpIR.SOURCE_KEY})
+        k = dc.keys()
+        for s in k:
+            if s in Device.dictionary:
+                irnma = Device.dictionary[s]
+                for x in irnma:
+                    if len(x):
+                        dc.update({x:(s,'',dc[s][2])})
+        if self.upnp_drc_dev:
+            _,v = next(iter(self.upnp_drc_dev.dir.iteritems()))
+            dc.update(v)
+        self.dir[self.get_remote_name()] = dc
+        
+    def get_channels_list(self):
+        if self.channels is None:
+            try:
+                res = self.a["GetChannelListURL"]()
+                self.channel_list_type = res["ChannelListType"]
+                self.channel_satellite_id = 0 if res["SatelliteID"] is None else res["SatelliteID"]
+                r = requests.get(res['ChannelListURL'])
+                webContent = r.content
+                self.channels = DeviceUpnpIRTA2._parse_channel_list(webContent)
+            except:
+                traceback.print_exc()
+                self.channels = None
+                
+    def send_action(self,actionexec,action,pay):
+        rv = None
+        try:
+            tp = pay[2]["type"]
+            if tp==DeviceUpnpIR.RC_KEY:
+                if self.upnp_drc_dev:
+                    return self.upnp_drc_dev.send_action(actionexec, action, pay)
+            elif tp==DeviceUpnpIR.NUMBER_KEY:
+                if self.init_device():
+                    if pay[0] in self.channels:
+                        vv = self.a["SetMainTVChannel"](**self.channels[pay[0]].as_params(self.channel_list_type,self.channel_satellite_id))
+                        if 'Result' in vv and vv['Result']=="OK":
+                            rv = 0
+                        else:
+                            print("Change channel rv "+str(vv))
+                            rv = 127
+                    else:
+                        rv = 255
+            elif tp==DeviceUpnpIR.SOURCE_KEY:
+                if self.init_device():
+                    if pay[0] in self.sources:
+                        vv = self.a["SetMainTVSource"](**self.sources[pay[0]].as_params())
+                        if 'Result' in vv and vv['Result']=="OK":
+                            rv = 0
+                        else:
+                            print("Change source rv "+str(vv))
+                            rv = 127
+                    else:
+                        rv = 255
+        except:
+            traceback.print_exc()
+            self.upnp_obj = None
+        return action.handler((self.host,self.port),dict(rv=None if rv is None else rv,uid=self.mac.encode('hex')))
+                
+    def get_sources_list(self):
+        if self.sources is None:
+            try:
+                res = self.a["GetSourceList"]()
+                xmldoc = minidom.parseString(res['SourceList'])
+                sources = xmldoc.getElementsByTagName('Source')
+                self.sources = dict()
+                for s in sources:
+                    src = Source(s)
+                    self.sources[DeviceUpnp.correct_upnp_name(src.sname)] = src
+            except:
+                traceback.print_exc()
+                self.sources = None
+        
+    @staticmethod
+    def _parse_channel_list(channel_list):
+        """Splits the binary channel list into channel entry fields and returns a list of Channels."""
+    
+        # The channel list is binary file with a 4-byte header, containing 2 unknown bytes and
+        # 2 bytes for the channel count, which must be len(list)-4/124, as each following channel
+        # is 124 bytes each. See Channel._parse_dat for how each entry is constructed.
+    
+        if len(channel_list) < 128:
+            raise ParseException(('channel list is smaller than it has to be for at least '\
+                                  'one channel (%d bytes (actual) vs. 128 bytes' % len(channel_list)),
+                                 ('Channel list: %s' % repr(channel_list)))
+    
+    
+        if (len(channel_list)-4) % 124 != 0:
+            raise ParseException(('channel list\'s size (%d) minus 128 (header) is not a multiple of '\
+                                  '124 bytes' % len(channel_list)),
+                                 ('Channel list: %s' % repr(channel_list)))
+    
+        actual_channel_list_len = (len(channel_list)-4) / 124
+        expected_channel_list_len = _getint(channel_list, 2)
+        if actual_channel_list_len != expected_channel_list_len:
+            raise ParseException(('Actual channel list length ((%d-4)/124=%d) does not equal expected '\
+                                  'channel list length (%d) as defined in header' % (len(channel_list),
+                                  actual_channel_list_len, expected_channel_list_len))
+                                 ('Channel list: %s' % repr(channel_list)))
+    
+        channels = {}
+        pos = 4
+        while pos < len(channel_list):
+            chunk = channel_list[pos:pos+124]
+            try:
+                ch = Channel(chunk)
+                channels[ch.dispno] = ch
+            except ParseException as pe:
+                pe.add_context('chunk starting at %d: %s' % (pos, repr(chunk)))
+                raise pe
+    
+            pos += 124
+    
+        print('Parsed %d channels'%len(channels))
+        return channels
+
+class DeviceUpnpIRRC(DeviceUpnpIR):
+    def __init__(self,hp = ('',0),mac = '',root = None,name = '',location='',deviceobj = None):
+        DeviceUpnpIR.__init__(self,hp,mac,root,name,location,deviceobj)
+        self.params = ["Contrast","Brightness","Volume","Mute","Sharpness"]
+        self.state_init = False
+        self.states = dict.fromkeys(self.params)
+        if deviceobj is not None:
+            self.get_states()
+        
+    def states_xml_device_node_write(self,el):
+        targets = SubElement(el, "states")
+        for k,v in self.states.iteritems():
+            if v is not None:
+                stel = SubElement(targets, "state",{'value':str(v)})
+                stel.text = k
+
+    def xml_element(self,root,flag = 0):
+        el = DeviceUpnpIR.xml_element(self, root, flag)
+        self.states_xml_device_node_write(el)
+        return el
+    
+    def fill_ir_list(self):
+        dc = dict()
+        for s,v in self.states.iteritems():
+            if v is not None:
+                s = s.lower()
+                if s=="mute":
+                    dc[s] = (s,s,{"type":DeviceUpnpIR.RC_KEY})
+                else:
+                    dc[s+"+"] = (s+"+",s+"+",{"type":DeviceUpnpIR.RC_KEY})
+                    for x in xrange(0,104,5):
+                        m = s+str(x)+"+"
+                        dc[m] = (m,m,{"type":DeviceUpnpIR.RC_KEY})
+                        
+        k = dc.keys()
+        for s in k:
+            if s in Device.dictionary:
+                irnma = Device.dictionary[s]
+                for x in irnma:
+                    if len(x):
+                        dc.update({x:(s,'',dc[s][2])})
+        self.dir[self.get_remote_name()] = dc
+    
+    def get_dir(self,rem,key):
+        if self.init_device():
+            #print("KKK "+key+" "+rem+str(self.dir))
+            if rem in self.dir:
+                #print("UUU "+key+" "+rem)
+                if key in self.dir[rem]:
+                    mo = re.search("^([^0-9]+)([0-9]+)\\+$", key)
+                    return (key,int(mo.group(2)),{"type":DeviceUpnpIR.RC_KEY})
+                else:        
+                    mo = re.search("([^#]+)#([0-9]+)", key)
+                    #print("DDDD "+key+" "+rem)
+                    if mo is not None:
+                        fp = mo.group(1)
+                        if fp in self.dir[rem]:
+                            return (fp,int(mo.group(2)),{"type":DeviceUpnpIR.RC_KEY})
+        return []
+
+    def send_action(self,actionexec,action,pay):
+        cmd = {}     
+        tp = pay[2]["type"]   
+        if tp!=DeviceUpnpIR.RC_KEY:
+            dt = 1023
+        else:
+            mo = re.search("^([^0-9\\+]+)", pay[0])
+            k = mo.group(1)
+            k = k.capitalize()
+            v = pay[1]
+            if k not in self.states or self.set_state(k, v) is None:
+                dt = None
+            elif self.states[k]!=v and k!="Mute":
+                dt = 511
+            else:
+                dt = 0
+                cmd[k] = v
+        #print("WWWW "+str(dt)+" "+str(self.states[k])+" "+str(v))
+        return action.handler((self.host,self.port),dict(rv=None if dt is None else dt,uid=self.mac.encode('hex'),cmd=cmd))
+    
+    def init_device(self):
+        if self.upnp_obj is None or self.a is None:
+            rv = DeviceUpnpIR.init_device(self)
+            if rv:
+                try:
+                    self.a = rv.service_map['RenderingControl'].action_map
+                    self.states = dict.fromkeys(self.params)
+                    self.state_init = False
+                    self.get_states()
+                except:
+                    traceback.print_exc()
+                    self.upnp_obj = None
+        if self.upnp_obj and self.a and len(self.dir)==0 and self.state_init:
+            self.fill_ir_list()
+                
+        return self.upnp_obj
+    
+    def set_state(self,k,val):
+        if self.init_device():
+            try:
+                if "Set"+k in self.a:
+                    if k=="Mute":
+                        self.get_states([k])
+                        val = 0 if self.states[k] else 1
+                    a = self.a['Set'+k]
+                    p = {'InstanceID':0,'Channel':'Master'}
+                    p[a.argsdef_in[2][0]] = str(val)
+                    out = a(**p)
+                    self.get_states([k])
+                    print("Calling method upnp "+k+" out "+str(out))
+                    return self.states[k]
+            except:
+                print("Action Set"+k+" args "+str(self.a['Set'+k].argsdef_in))
+                self.upnp_obj = None
+                traceback.print_exc()
+        return None
+            
+    
+    def get_states(self,what = None):
+        if self.init_device():
+            if what is None:
+                what = self.states.keys()
+            for k in what:
+                try:
+                    st = self.a['Get'+k](InstanceID = 0,Channel='Master')
+                    if len(st)>1 and 'Current'+k in st:
+                        st = st['Current'+k]
+                    elif len(st):
+                        st = st.values()[0]
+                    else:
+                        st = None
+                    self.states[k] = st
+                    if st is not None:
+                        self.state_init = True
+                    print(self.name+" Upnp State "+k+" = "+str(st))
+                except:
+                    traceback.print_exc()
+                    self.upnp_obj = None
 
 class DevicePrimelan(Device):
     #0: doppio pulsante
@@ -2410,6 +3008,7 @@ class DeviceRM(IrManager,ManTimerManager):
         if rv is None or rv!=0:
             #Forzo futura riconnessione
             print("Blackbeam %s error: will try to reconnect" % self.name)
+            self.offt = 0
             self.inner = None
         return action.handler(host,dict(rv=rv,uid=mac,cmd=cmd))
 
@@ -2760,7 +3359,7 @@ class ActionSubscribe(Action):
             return list()
 
     def get_payload(self):
-        if isinstance(self.device, DeviceCT10) or isinstance(self.device, DeviceRM):
+        if isinstance(self.device, DeviceCT10) or isinstance(self.device, DeviceRM) or isinstance(self.device, DeviceUpnp):
             return ''
         else:
             return MAGIC + SUBSCRIBE_LEN + SUBSCRIBE_ID + self.device.mac \
@@ -2815,6 +3414,7 @@ class ActionDiscovery(Action):
         pport2 = self.pport2 if self.pport2 else actionexec.prime_port2
         if len(php[0]) and len(ppasw) and len(pcodu):
             self.hosts.update(DevicePrimelan.discover(php, ppasw, pcodu, pport2, timeout))
+        self.hosts.update(DeviceUpnp.discover())
         return Action.do_presend_operations(self, actionexec)
     
     def get_timeout(self):
@@ -3344,14 +3944,7 @@ class ActionEmitir(Action):
                 tmpa = a.split(':')
                 tmp = tmpa[0]
                 if len(tmp):
-                    mo = re.search("([^#]+)#([0-9]+)", tmpa[1])
-                    if mo is not None:
-                        nn = int(mo.group(2))
-                        kk = tmp+":"+mo.group(1)
-                        for _ in xrange(nn):
-                            irname.append(kk)
-                    else:
-                        irname.append(a)
+                    irname.append(a)
                     dname = tmp
             elif cnt==0:
                 if len(a)>1 and a[0]=='$':
@@ -3387,14 +3980,14 @@ class ActionEmitir(Action):
             ('cmd' in data and data['cmd']==15 and \
             ((isinstance(self.device, DeviceCT10) and \
                     'clientSessionId' in data and self.device.clientSessionId==data['clientSessionId']) or \
-             isinstance(self.device, DeviceRM)))
+             isinstance(self.device, DeviceRM)) or isinstance(self.device, DeviceUpnpIR))
 
     def handler(self,hp,data):
         if self.is_my_mac(data) and self.is_emitir_response(data):
             if not isinstance(self.device, IrManager):
                 return 2
             else:
-                if isinstance(self.device, DeviceRM):
+                if isinstance(self.device, DeviceRM) or isinstance(self.device, DeviceUpnpIR):
                     if data['rv'] is None or data['rv']>0:
                         return data['rv']
                 self.idx+=1
@@ -3408,6 +4001,7 @@ class ActionEmitir(Action):
                 else:
                     return 0
         else:
+            #print("PPP "+str(data)+self.device.mac.encode('hex'))
             return None
 
     def convert_ir(self,dev,nm):
@@ -3418,9 +4012,9 @@ class ActionEmitir(Action):
         nma = []
         del self.irname[self.idx]
         while True:
-            if (nm in convdict) and (nm not in self.device.dir[dev]):
+            if (nm in convdict) and (not self.device.get_dir(dev,nm)):
                 nm = convdict[nm]
-            if nm in self.device.dir[dev]:
+            if self.device.get_dir(dev,nm):
                 idxbis+=1
                 self.irname.insert(self.idx+idxbis, dev+":"+nm)
                 idxa+=1
@@ -3429,13 +4023,28 @@ class ActionEmitir(Action):
                 else:
                     nm = nma[idxa]
             else:
+                mo = re.search("([^#]+)#([0-9]+)", nm)
+                if mo is not None:
+                    x = int(mo.group(2))
+                    c = mo.group(1)
+                    if (c in  convdict) and (not self.device.get_dir(dev,c)):
+                        c = convdict[c]
+                    if not self.device.get_dir(dev,c):
+                        nma = [c]*x
+                        idxa = 0
+                        nm = nma[idxa]
+                    else:
+                        for _ in xrange(x):
+                            idxbis+=1
+                            self.irname.insert(self.idx+idxbis, dev+":"+c)
+                        break
                 mo = re.search("[^\s]+ ([0-9]+)$", nm)
                 if mo is not None:
                     x = int(mo.group(1))
                     c = nm[0:nm.rfind(' ')]
-                    if (c in  convdict) and (c not in self.device.dir[dev]):
+                    if (c in  convdict) and (not self.device.get_dir(dev,c)):
                         c = convdict[c]
-                    if x>20 or (c not in self.device.dir[dev]):
+                    if x>20 or (not self.device.get_dir(dev,c)):
                         nma = nm.split(' ')
                         idxa = 0
                         nm = nma[idxa]
@@ -3466,7 +4075,7 @@ class ActionEmitir(Action):
                         else:
                             nm = nma[idxa]
         if idxbis>=0:
-            irc = self.device.dir[dev][self.irname[self.idx][len(dev)+1:]]
+            irc = self.device.get_dir(dev,self.irname[self.idx][len(dev)+1:])
         return irc
 
     def create_message(self,irdata):
@@ -3499,6 +4108,8 @@ class ActionEmitir(Action):
             return cmd
         elif isinstance(self.device, DeviceRM):
             return irdata[0]
+        elif isinstance(self.device, DeviceUpnpIR):
+            return irdata
         else:
             return ''
 
@@ -3509,10 +4120,9 @@ class ActionEmitir(Action):
                 nm = tt[1]
                 dev = tt[0]
                 irdata = []
-                if nm not in self.device.dir[dev]:
+                irdata = self.device.get_dir(dev,nm)
+                if not irdata:
                     irdata = self.convert_ir(dev,nm)
-                else:
-                    irdata = self.device.dir[dev][nm]
                 if len(irdata):
                     self.irc.append(self.device.ir_encode(irdata[0]))
                     self.mqtt_publish_key(dev,nm,1)
@@ -3628,7 +4238,8 @@ class ActionViewtable3(ActionViewtable):
     def get_payload(self):
         if isinstance(self.device,DeviceAllOne) or\
             isinstance(self.device, DeviceCT10) or\
-            isinstance(self.device, DeviceRM):
+            isinstance(self.device, DeviceRM) or\
+            isinstance(self.device, DeviceUpnpIR):
             return '';
         else:
             return ActionViewtable.get_payload(self)
