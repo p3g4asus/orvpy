@@ -1,2 +1,7 @@
 eclipse.preferences.version=1
 encoding//src/main.py=utf-8
+encoding//src/samsungctl/__init__.py=utf-8
+encoding//src/samsungctl/__main__.py=utf-8
+encoding//src/samsungctl/config.py=utf-8
+encoding//src/samsungctl/remote.py=utf-8
+encoding//src/samsungctl/remote_encrypted/__init__.py=utf-8

@@ -33,6 +33,8 @@ import SocketServer
 import select
 import SimpleHTTPServer
 import upnpclient
+import samsungctl
+from orvibo.samsung_mappings import samsung_mappings
 
 
 def _default(self, obj):
@@ -1101,6 +1103,9 @@ class Device(object):
     epoch = datetime.utcfromtimestamp(0)
     dictionary = dict()
     
+    def connect_devices(self,device_map):
+        pass
+    
     def state_value_conv(self,s):
         return s
 
@@ -1728,7 +1733,7 @@ class IrManager(Device):
             if root.hasAttribute('emit_delay'):
                 try:
                     ed = float(root.attributes['emit_delay'].value)
-                    if ed>=0.3:
+                    if ed>0:
                         self.emit_ir_delay = ed
                 except:
                     pass
@@ -2202,42 +2207,19 @@ class DeviceUpnp(Device):
             print("Searching upnp devices")
             devs = upnpclient.discover(timeout=5)
             print("Found "+str(len(devs))+" upnp devices")
-            rc = {"RenderingControl":{},"MainTVAgent2":{}}
+            rc = {"RenderingControl":DeviceUpnpIRRC,"MainTVAgent2":DeviceUpnpIRTA2}
             for d in devs:
-                u = urlparse.urlparse(d.location)
-                for k in rc.keys():
+                u = urlparse.urlparse(d.location)                   
+                for k,v in rc.iteritems():
                     if k in d.service_map:
                         print("Found "+k+" at "+d.location)
-                        rc[k]['{}:{}'.format(u.hostname,u.port)] = d
-            for k,v in rc["MainTVAgent2"].iteritems():
-                drc = None
-                u = urlparse.urlparse(v.location)
-                hp = (u.hostname,u.port)
-                if k in rc["RenderingControl"]:
-                    d = rc["RenderingControl"][k]
-                    drc = DeviceUpnpIRRC(hp = hp,\
-                             mac=d.udn,\
-                             name=DeviceUpnp.get_name(d),\
-                             location=d.location,\
+                        hp = (u.hostname,u.port)
+                        m = '{}:{}:'.format(*hp)+k
+                        out[m] = v(hp = hp,\
+                             mac=m,\
+                             name='',\
+                             location=d.location,
                              deviceobj=d)
-                    del rc["RenderingControl"][k]
-                out['{}:{}:'.format(*hp)+v.udn] = \
-                    DeviceUpnpIRTA2(hp = hp,\
-                             mac=v.udn,\
-                             name=DeviceUpnp.get_name(v),\
-                             location=v.location,
-                             deviceobj=v,\
-                             rcloc='' if drc is None else drc.upnp_location,
-                             rc=drc)
-            for k,v in rc["RenderingControl"].iteritems():
-                u = urlparse.urlparse(v.location)
-                hp = (u.hostname,u.port)
-                out['{}:{}:'.format(*hp)+v.udn] = \
-                    DeviceUpnpIRRC(hp = hp,\
-                             mac=v.udn,\
-                             name=DeviceUpnp.get_name(v),\
-                             location=v.location,
-                             deviceobj=v)
         except:
             traceback.print_exc()
         return out
@@ -2277,8 +2259,22 @@ class Channel(object):
 
     def __init__(self, from_dat):
         """Constructs the Channel object from a binary channel list chunk."""
-
-        self._parse_dat(from_dat)
+        if isinstance(from_dat, minidom.Node):
+            self._parse_xml(from_dat)
+        else:
+            self._parse_dat(from_dat)
+            
+    def _parse_xml(self,root):
+        try:
+            self.ch_type = root.getElementsByTagName('ChType')[0].childNodes[0].nodeValue
+            self.major_ch = root.getElementsByTagName('MajorCh')[0].childNodes[0].nodeValue
+            self.minor_ch = root.getElementsByTagName('MinorCh')[0].childNodes[0].nodeValue
+            self.ptc      = root.getElementsByTagName('PTC')[0].childNodes[0].nodeValue
+            self.prog_num = root.getElementsByTagName('ProgNum')[0].childNodes[0].nodeValue
+            self.dispno = self.major_ch
+            self.title = ''
+        except:
+            raise ParseException("Wrong XML document")
 
     def _parse_dat(self, buf):
         """Parses the binary data from a channel list chunk and initilizes the
@@ -2355,6 +2351,112 @@ class Source(object):
     def as_params(self):
         return {'Source':self.sname,'ID':self.sid,'UiID':self.sid}
     
+class DeviceSamsungCtl(IrManager,ManTimerManager):
+    CTL_KEY = "ctl"
+    def __init__(self,hp = ('',0),mac = '',root = None,name = '',conf = ''):
+        Device.__init__(self,hp,name,root,name)
+        ManTimerManager.__init__(self, root)
+        IrManager.__init__(self,hp,mac,root,name)
+        self.remote = None
+        self.last_init = 0
+        self.fill_ir_list()
+        if root is None:
+            self.conffile = conf
+        else:
+            self.conffile = root.attributes['conffile'].value
+        self.config = None
+        self.init_device()
+        
+    def ir_decode(self,irc):
+        return irc
+    
+    def fill_ir_list(self):
+        dc = {k:(v,k,{'type':DeviceSamsungCtl.CTL_KEY}) for k,v in samsung_mappings.iteritems()}
+        k = dc.keys()
+        for s in k:
+            if s in Device.dictionary:
+                irnma = Device.dictionary[s]
+                for x in irnma:
+                    if len(x):
+                        dc.update({x:(s,'',dc[s][2])})
+        self.dir[self.name] = dc
+        
+    def destroy_device(self):
+        if self.remote is not None:
+            try:
+                self.remote.close()
+            except:
+                pass
+            self.remote = None
+        self.offt = 0
+    
+    def init_device(self):
+        now = time.time()
+
+        if self.remote is None or now-self.last_init>=60:
+            try:
+                self.last_init = now
+                self.destroy_device()
+                if self.config is None:
+                    cc = samsungctl.Config.load(self.conffile)
+                    cc.log_level = samsungctl.Config.LOG_DEBUG
+                    self.config = cc
+                self.remote = samsungctl.Remote(self.config)
+                if not self.remote.open():
+                    self.remote = None
+            except:
+                traceback.print_exc()
+                self.destroy_device()
+                
+        return self.remote
+
+    def ir_encode(self,irc):
+        return irc
+    
+    def to_dict(self):
+        rv = Device.to_dict(self)
+        rv.update({'conffile':self.conffile})
+        return rv
+        
+    def copy_extra_from(self,already_saved_device):
+        Device.copy_extra_from(self,already_saved_device)
+        IrManager.copy_extra_from(self,already_saved_device)
+        ManTimerManager.copy_extra_from(self,already_saved_device)
+
+    def xml_element(self,root,flag = 0):
+        el = IrManager.xml_element(self, root, flag)
+        ManTimerManager.xml_element(self, el, flag)
+        return el
+
+    def on_stop(self):
+        IrManager.on_stop(self)
+        ManTimerManager.on_stop(self)    
+    
+    def to_json(self):
+        rv = Device.to_json(self)
+        rv.update(IrManager.to_json(self))
+        rv.update(ManTimerManager.to_json(self))
+        return rv
+    
+    def send_action(self,actionexec,action,pay):
+        rv = None
+        mac = self.mac
+        if isinstance(action, ActionEmitir):
+            try:
+                if self.init_device():
+                    print(self.name+" sending "+pay[0])
+                    if not self.remote.control(pay[0]):
+                        rv = 5
+                        self.destroy_device()
+                    else:
+                        rv = 0
+            except:
+                traceback.print_exc()
+                self.destroy_device()
+            if "mac" in pay[2]:
+                mac = pay[2]["mac"]
+        return action.handler((self.host,self.port),dict(rv=None if rv is None else rv,uid=mac.encode('hex')))
+    
 class DeviceUpnpIR(DeviceUpnp,IrManager,ManTimerManager):
     NUMBER_KEY = "1"
     SOURCE_KEY = "0"
@@ -2364,15 +2466,15 @@ class DeviceUpnpIR(DeviceUpnp,IrManager,ManTimerManager):
         ManTimerManager.__init__(self, root)
         IrManager.__init__(self,hp,mac,root,name)
         self.a = None
+        if root is not None and root.hasAttribute('remote_name'):
+            self.remote_name = root.attributes['remote_name'].value
+            self.ir_load = True
+        else:
+            self.ir_load = False
+            self.remote_name = self.name
         
     def ir_decode(self,irc):
         return irc
-    
-    def get_remote_name(self):
-        if len(self.dir):
-            return next(iter(self.dir.keys()))
-        else:
-            return DeviceUpnp.correct_upnp_name(self.name)
 
     def ir_encode(self,irc):
         return irc
@@ -2381,7 +2483,8 @@ class DeviceUpnpIR(DeviceUpnp,IrManager,ManTimerManager):
         DeviceUpnp.copy_extra_from(self,already_saved_device)
         IrManager.copy_extra_from(self,already_saved_device)
         ManTimerManager.copy_extra_from(self,already_saved_device)
-
+        self.remote_name = already_saved_device.remote_name
+        
     def xml_element(self,root,flag = 0):
         el = IrManager.xml_element(self, root, flag)
         ManTimerManager.xml_element(self, el, flag)
@@ -2398,72 +2501,107 @@ class DeviceUpnpIR(DeviceUpnp,IrManager,ManTimerManager):
         return rv        
     
 class DeviceUpnpIRTA2(DeviceUpnpIR):
-    def __init__(self,hp = ('',0),mac = '',root = None,name = '',location='',deviceobj = None,rcloc = '',rc = None):
+    def __init__(self,hp = ('',0),mac = '',root = None,name = '',location='',deviceobj = None):
         DeviceUpnpIR.__init__(self,hp,mac,root,name,location,deviceobj)
-        self.upnp_drc_dev = rc
         self.channel_list_type = None
         self.channel_satellite_id = None
-        self.channels = None
-        self.sources = None
-        if root is None:
-            self.upnp_drc_location = rcloc
-        else:
-            self.upnp_drc_location = root.attributes['upnp_drc_location'].value
+        self.channels = {}
+        self.sources = {}
+        self.samsungctl_dev_name = ''
+        self.upnp_rc_dev_name = ''
+        self.tv_source = "TV"
+        self.upnp_rc_dev = None
+        self.samsungctl_dev = None
+        self.current_source = ''
+        self.current_source_t = 0
+        if root is not None:
+            self.upnp_rc_dev_name = root.attributes['upnp_rc_dev_name'].value
+            self.samsungctl_dev_name = root.attributes['samsungctl_dev_name'].value
+            self.tv_source = root.attributes['tv_source'].value
             
         #print("LOC "+self.upnp_drc_location)
         if deviceobj is not None:
             self.init_device()
             
-    def get_remote_name(self):
-        if self.upnp_drc_dev is not None:
-            return self.upnp_drc_dev.get_remote_name()
-        else:
-            return DeviceUpnpIR.get_remote_name(self)
+    def connect_devices(self, device_map):
+        DeviceUpnpIR.connect_devices(self, device_map)
+        fill = False
+        if self.samsungctl_dev_name in device_map:
+            self.samsungctl_dev = device_map[self.samsungctl_dev_name]
+            if self.upnp_obj is not None and self.samsungctl_dev.init_device():
+                fill = True
+        if self.upnp_rc_dev_name in device_map:
+            self.upnp_rc_dev = device_map[self.upnp_rc_dev_name]
+            if self.upnp_obj is not None and self.upnp_rc_dev.init_device():
+                fill = True
+        if fill:
+            self.fill_ir_list()
+            
+    def get_current_source(self):
+        now = time.time()
+        if not len(self.current_source) or now-self.current_source_t>=10:
+            try:
+                vv = self.a["GetCurrentExternalSource"]()
+                if 'Result' in vv and vv['Result']=="OK":
+                    rv = DeviceUpnp.correct_upnp_name(vv['CurrentExternalSource'])
+                    self.current_source_t = now
+                else:
+                    rv = ''
+            except:
+                traceback.print_exc()
+                rv = ''
+            self.current_source = rv
+        return self.current_source
+    
+    def copy_extra_from(self,already_saved_device):
+        DeviceUpnpIR.copy_extra_from(self,already_saved_device)
+        self.samsungctl_dev_name = already_saved_device.samsungctl_dev_name
+        self.upnp_rc_dev_name = already_saved_device.upnp_rc_dev_name
+        self.tv_source = already_saved_device.tv_source
     
     def get_dir(self,rem,key):
         if self.init_device():
             if rem in self.dir:
                 if key in self.dir[rem]:
-                    return self.dir[rem][key]
-                else:
-                    #print("JJJ "+key+" "+str(self.upnp_drc_dev.dir))
-                    if self.upnp_drc_dev and len(self.upnp_drc_dev.dir):
-                        rv = self.upnp_drc_dev.get_dir(self.upnp_drc_dev.dir.keys()[0], key)
-                        if rv:
-                            return rv
-                    mo = re.search("^([0-9]+)$", key)
-                    if mo is not None:
+                    pay = self.dir[rem][key]
+                    tp = pay[2]["type"]
+                    if tp==DeviceUpnpIR.SOURCE_KEY:
+                        return self.dir[rem][key]
+                #print("JJJ "+key+" "+str(self.upnp_drc_dev.dir))
+                if self.upnp_rc_dev and len(self.upnp_rc_dev.dir):
+                    rv = self.upnp_rc_dev.get_dir(self.upnp_rc_dev.dir.keys()[0], key)
+                    if rv:
+                        return rv
+                mo = re.search("^([0-9]+)$", key)
+                if mo is not None:
+                    if (self.samsungctl_dev is not None and self.get_current_source()==self.tv_source) or\
+                         self.samsungctl_dev is None:
                         return (key,'',{"type":DeviceUpnpIR.NUMBER_KEY})
+                if self.samsungctl_dev and len(self.samsungctl_dev.dir):
+                    rv = self.samsungctl_dev.get_dir(self.samsungctl_dev.dir.keys()[0], key)
+                    if rv:
+                        return rv
         return []
         
-            
     def to_dict(self):
         rv = DeviceUpnpIR.to_dict(self)
-        rv.update({'upnp_drc_location':self.upnp_drc_location})
+        rv.update({'upnp_rc_dev_name':self.upnp_rc_dev_name})
+        rv.update({'samsungctl_dev_name':self.samsungctl_dev_name})
+        rv.update({'tv_source':self.tv_source})
         return rv
+    
+    def destroy_device(self):
+        self.upnp_obj = None
+        self.offt = 0
     
     def init_device(self):
         if self.upnp_obj is None or self.a is None or len(self.dir)==0 or len(self.sources)==0:
             rv = DeviceUpnpIR.init_device(self)
             if rv:
-                if self.upnp_drc_dev is None:
-                    if len(self.upnp_drc_location):
-                        try:
-                            #print("QQQ Going "+self.upnp_drc_location)
-                            upnp_drc_obj = upnpclient.Device(self.upnp_drc_location)
-                            u = urlparse.urlparse(self.upnp_drc_location)
-                            hp = (u.hostname,u.port)
-                            self.upnp_drc_dev = DeviceUpnpIRRC(hp = hp,\
-                                         mac=self.mac,\
-                                         name=DeviceUpnp.get_name(upnp_drc_obj),\
-                                         location=upnp_drc_obj.location,
-                                         deviceobj=upnp_drc_obj)
-                        except:
-                            traceback.print_exc()
-                            self.upnp_drc_dev = None
-                else:
-                    self.upnp_drc_dev.mac = self.mac
-                    self.upnp_drc_dev.get_states()
+                if self.upnp_rc_dev is not None:
+                    self.upnp_rc_dev.init_device()
+                if self.samsungctl_dev is not None:
+                    self.samsungctl_dev.init_device()
                 try:
                     self.a = rv.service_map['MainTVAgent2'].action_map
                     self.get_channels_list()
@@ -2471,30 +2609,43 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                     self.fill_ir_list()
                 except:
                     traceback.print_exc();
-                    self.upnp_obj = None
+                    self.destroy_device()
                 
         return self.upnp_obj
     
     def fill_ir_list(self):
-        dc = dict() 
-        for i in xrange(10):
-            dc[str(i)] = (str(i),str(i),{"type":DeviceUpnpIR.NUMBER_KEY})
-        for s in self.sources.keys():
-            dc[s] = (s,s,{"type":DeviceUpnpIR.SOURCE_KEY})
-        k = dc.keys()
-        for s in k:
-            if s in Device.dictionary:
-                irnma = Device.dictionary[s]
-                for x in irnma:
-                    if len(x):
-                        dc.update({x:(s,'',dc[s][2])})
-        if self.upnp_drc_dev:
-            _,v = next(iter(self.upnp_drc_dev.dir.iteritems()))
-            dc.update(v)
-        self.dir[self.get_remote_name()] = dc
+        if not self.ir_load:
+            dc = dict() 
+            for i in xrange(10):
+                dc[str(i)] = (str(i),str(i),{"type":DeviceUpnpIR.NUMBER_KEY})
+            for s in self.sources.keys():
+                dc[s] = (s,s,{"type":DeviceUpnpIR.SOURCE_KEY})
+            k = dc.keys()
+            for s in k:
+                if s in Device.dictionary:
+                    irnma = Device.dictionary[s]
+                    for x in irnma:
+                        if len(x):
+                            dc.update({x:(s,'',dc[s][2])})
+            if self.samsungctl_dev:
+                _,v = next(iter(self.samsungctl_dev.dir.iteritems()))
+                dc.update(v)
+            if self.upnp_rc_dev:
+                _,v = next(iter(self.upnp_rc_dev.dir.iteritems()))
+                for k in v.keys():
+                    mo = re.search("^([^\\+]+)(\\+?)", k)
+                    if mo is not None:
+                        if len(mo.group(2)):
+                            try:
+                                del dc[mo.group(1)+"-"]
+                            except:
+                                pass
+                dc.update(v)
+            
+            self.dir[self.remote_name] = dc
         
     def get_channels_list(self):
-        if self.channels is None:
+        if not len(self.channels):
             try:
                 res = self.a["GetChannelListURL"]()
                 self.channel_list_type = res["ChannelListType"]
@@ -2504,44 +2655,79 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                 self.channels = DeviceUpnpIRTA2._parse_channel_list(webContent)
             except:
                 traceback.print_exc()
-                self.channels = None
+                self.channels = {}
                 
     def send_action(self,actionexec,action,pay):
         rv = None
-        try:
-            tp = pay[2]["type"]
-            if tp==DeviceUpnpIR.RC_KEY:
-                if self.upnp_drc_dev:
-                    return self.upnp_drc_dev.send_action(actionexec, action, pay)
-            elif tp==DeviceUpnpIR.NUMBER_KEY:
-                if self.init_device():
-                    if pay[0] in self.channels:
-                        vv = self.a["SetMainTVChannel"](**self.channels[pay[0]].as_params(self.channel_list_type,self.channel_satellite_id))
-                        if 'Result' in vv and vv['Result']=="OK":
-                            rv = 0
+        outstate = dict()
+        if isinstance(action, ActionEmitir):
+            try:
+                tp = pay[2]["type"]
+                if tp==DeviceUpnpIR.RC_KEY:
+                    if self.upnp_rc_dev:
+                        pay[2]["mac"] = self.mac
+                        return self.upnp_rc_dev.send_action(actionexec, action, pay)
+                if tp==DeviceSamsungCtl.CTL_KEY:
+                    if self.samsungctl_dev:
+                        pay[2]["mac"] = self.mac
+                        return self.samsungctl_dev.send_action(actionexec, action, pay)
+                elif tp==DeviceUpnpIR.NUMBER_KEY:
+                    if self.init_device():
+                        if pay[0] in self.channels:
+                            vv = self.a["SetMainTVChannel"](**self.channels[pay[0]].as_params(self.channel_list_type,self.channel_satellite_id))
+                            if 'Result' in vv and vv['Result']=="OK":
+                                rv = 0
+                            else:
+                                print("Change channel rv "+str(vv))
+                                rv = 127
                         else:
-                            print("Change channel rv "+str(vv))
-                            rv = 127
-                    else:
-                        rv = 255
-            elif tp==DeviceUpnpIR.SOURCE_KEY:
-                if self.init_device():
-                    if pay[0] in self.sources:
-                        vv = self.a["SetMainTVSource"](**self.sources[pay[0]].as_params())
-                        if 'Result' in vv and vv['Result']=="OK":
-                            rv = 0
+                            rv = 255
+                elif tp==DeviceUpnpIR.SOURCE_KEY:
+                    if self.init_device():
+                        if pay[0] in self.sources:
+                            vv = self.a["SetMainTVSource"](**self.sources[pay[0]].as_params())
+                            if 'Result' in vv and vv['Result']=="OK":
+                                rv = 0
+                            else:
+                                print("Change source rv "+str(vv))
+                                rv = 127
                         else:
-                            print("Change source rv "+str(vv))
-                            rv = 127
+                            rv = 255
+            except:
+                traceback.print_exc()
+                self.upnp_obj = None
+        elif isinstance(action, ActionGetstate):
+            if self.init_device():
+                rv = 0
+                try:
+                    vv = self.a["GetCurrentMainTVChannel"]()
+                    if 'Result' in vv and vv['Result']=="OK":
+                        xmldoc = minidom.parseString(vv['CurrentChannel'])
+                        c = Channel(xmldoc)
+                        outstate['channel'] = c.major_ch
                     else:
-                        rv = 255
-        except:
-            traceback.print_exc()
-            self.upnp_obj = None
-        return action.handler((self.host,self.port),dict(rv=None if rv is None else rv,uid=self.mac.encode('hex')))
+                        rv = 32
+                except:
+                    traceback.print_exc()
+                    rv = 2
+                vv = self.get_current_source()
+                if len(vv):
+                    outstate['source'] = vv
+                else:
+                    rv|=4
+                    
+                if self.upnp_rc_dev:
+                    rv2 = self.upnp_rc_dev.get_states()
+                    outstate.update(self.upnp_rc_dev.states)
+                    if rv2 is None:
+                        rv|=8
+                    elif rv2>0:
+                        rv|=16
+                    
+        return action.handler((self.host,self.port),dict(rv=None if rv is None else rv,uid=self.mac.encode('hex'),outstate=outstate))
                 
     def get_sources_list(self):
-        if self.sources is None:
+        if not len(self.sources):
             try:
                 res = self.a["GetSourceList"]()
                 xmldoc = minidom.parseString(res['SourceList'])
@@ -2549,7 +2735,9 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                 self.sources = dict()
                 for s in sources:
                     src = Source(s)
-                    self.sources[DeviceUpnp.correct_upnp_name(src.sname)] = src
+                    p = DeviceUpnp.correct_upnp_name(src.sname)
+                    if p!='av' and p!='AV':
+                        self.sources[DeviceUpnp.correct_upnp_name(src.sname)] = src
             except:
                 traceback.print_exc()
                 self.sources = None
@@ -2604,7 +2792,7 @@ class DeviceUpnpIRRC(DeviceUpnpIR):
         self.state_init = False
         self.states = dict.fromkeys(self.params)
         if deviceobj is not None:
-            self.get_states()
+            self.init_device()
         
     def states_xml_device_node_write(self,el):
         targets = SubElement(el, "states")
@@ -2619,63 +2807,79 @@ class DeviceUpnpIRRC(DeviceUpnpIR):
         return el
     
     def fill_ir_list(self):
-        dc = dict()
-        for s,v in self.states.iteritems():
-            if v is not None:
-                s = s.lower()
-                if s=="mute":
-                    dc[s] = (s,s,{"type":DeviceUpnpIR.RC_KEY})
-                else:
-                    dc[s+"+"] = (s+"+",s+"+",{"type":DeviceUpnpIR.RC_KEY})
-                    for x in xrange(0,104,5):
-                        m = s+str(x)+"+"
-                        dc[m] = (m,m,{"type":DeviceUpnpIR.RC_KEY})
-                        
-        k = dc.keys()
-        for s in k:
-            if s in Device.dictionary:
-                irnma = Device.dictionary[s]
-                for x in irnma:
-                    if len(x):
-                        dc.update({x:(s,'',dc[s][2])})
-        self.dir[self.get_remote_name()] = dc
+        if not self.ir_load:
+            dc = dict()
+            for s,v in self.states.iteritems():
+                if v is not None:
+                    s = s.lower()
+                    if s=="mute":
+                        dc[s] = (s,s,{"type":DeviceUpnpIR.RC_KEY})
+                    else:
+                        dc[s+"+"] = (s+"+",s+"+",{"type":DeviceUpnpIR.RC_KEY})
+                        for x in xrange(0,104,5):
+                            m = s+str(x)+"+"
+                            dc[m] = (m,m,{"type":DeviceUpnpIR.RC_KEY})
+                            
+            k = dc.keys()
+            for s in k:
+                if s in Device.dictionary:
+                    irnma = Device.dictionary[s]
+                    for x in irnma:
+                        if len(x):
+                            dc.update({x:(s,'',dc[s][2])})
+            self.dir[self.remote_name] = dc
     
     def get_dir(self,rem,key):
         if self.init_device():
             #print("KKK "+key+" "+rem+str(self.dir))
             if rem in self.dir:
                 #print("UUU "+key+" "+rem)
-                if key in self.dir[rem]:
-                    mo = re.search("^([^0-9]+)([0-9]+)\\+$", key)
-                    return (key,int(mo.group(2)),{"type":DeviceUpnpIR.RC_KEY})
-                else:        
-                    mo = re.search("([^#]+)#([0-9]+)", key)
-                    #print("DDDD "+key+" "+rem)
-                    if mo is not None:
-                        fp = mo.group(1)
-                        if fp in self.dir[rem]:
-                            return (fp,int(mo.group(2)),{"type":DeviceUpnpIR.RC_KEY})
+                mo = re.search("^([^0-9\\+\\-]+)([0-9]*)([\\+\\-]?)$", key)
+                if mo is not None:
+                    fp = mo.group(1)+("+"*len(mo.group(3)))
+                    if fp in self.dir[rem]:
+                        p = mo.group(2)
+                        return (key,int(p) if len(p) else 1,{"type":DeviceUpnpIR.RC_KEY})
+                mo = re.search("^([^#\\+\\-]+)([\\+\\-]?)#([0-9]+)$", key)
+                #print("DDDD "+key+" "+rem)
+                if mo is not None:
+                    fp = mo.group(1)+("+"*len(mo.group(2)))
+                    if fp in self.dir[rem]:
+                        return (fp,int(mo.group(3)),{"type":DeviceUpnpIR.RC_KEY})
         return []
 
     def send_action(self,actionexec,action,pay):
-        cmd = {}     
-        tp = pay[2]["type"]   
-        if tp!=DeviceUpnpIR.RC_KEY:
-            dt = 1023
-        else:
-            mo = re.search("^([^0-9\\+]+)", pay[0])
-            k = mo.group(1)
-            k = k.capitalize()
-            v = pay[1]
-            if k not in self.states or self.set_state(k, v) is None:
-                dt = None
-            elif self.states[k]!=v and k!="Mute":
-                dt = 511
+        cmd = {}
+        outstate = {}
+        mac = self.mac
+        dt = None
+        if isinstance(action, ActionEmitir):
+            tp = pay[2]["type"]
+            if tp!=DeviceUpnpIR.RC_KEY:
+                dt = 1023
             else:
-                dt = 0
-                cmd[k] = v
-        #print("WWWW "+str(dt)+" "+str(self.states[k])+" "+str(v))
-        return action.handler((self.host,self.port),dict(rv=None if dt is None else dt,uid=self.mac.encode('hex'),cmd=cmd))
+                mo = re.search("^([^0-9\\+]+)", pay[0])
+                k = mo.group(1)
+                k = k.capitalize()
+                v = pay[1]
+                if k not in self.states or self.set_state(k, v) is None:
+                    dt = None
+                elif self.states[k]!=v and k!="Mute":
+                    dt = 511
+                else:
+                    dt = 0
+                    cmd[k] = v
+            if "mac" in pay[2]:
+                mac = pay[2]["mac"]
+        elif isinstance(action, ActionGetstate):
+            dt = self.get_states()
+            outstate.update(self.states)
+                    
+        return action.handler((self.host,self.port),dict(rv=None if dt is None else dt,uid=mac.encode('hex'),cmd=cmd))
+    
+    def destroy_device(self):
+        self.upnp_obj = None
+        self.offt = 0
     
     def init_device(self):
         if self.upnp_obj is None or self.a is None:
@@ -2688,7 +2892,7 @@ class DeviceUpnpIRRC(DeviceUpnpIR):
                     self.get_states()
                 except:
                     traceback.print_exc()
-                    self.upnp_obj = None
+                    self.destroy_device()
         if self.upnp_obj and self.a and len(self.dir)==0 and self.state_init:
             self.fill_ir_list()
                 
@@ -2710,12 +2914,13 @@ class DeviceUpnpIRRC(DeviceUpnpIR):
                     return self.states[k]
             except:
                 print("Action Set"+k+" args "+str(self.a['Set'+k].argsdef_in))
-                self.upnp_obj = None
+                self.destroy_device()
                 traceback.print_exc()
         return None
             
     
     def get_states(self,what = None):
+        rv = 0
         if self.init_device():
             if what is None:
                 what = self.states.keys()
@@ -2727,14 +2932,20 @@ class DeviceUpnpIRRC(DeviceUpnpIR):
                     elif len(st):
                         st = st.values()[0]
                     else:
+                        rv += 1
                         st = None
                     self.states[k] = st
                     if st is not None:
-                        self.state_init = True
+                        if rv<500:
+                            rv+=500
+                            self.state_init = True
                     print(self.name+" Upnp State "+k+" = "+str(st))
                 except:
                     traceback.print_exc()
-                    self.upnp_obj = None
+        if rv>=500:
+            return rv-500
+        else:
+            return None
 
 class DevicePrimelan(Device):
     #0: doppio pulsante
@@ -3946,6 +4157,8 @@ class ActionEmitir(Action):
                 if len(tmp):
                     irname.append(a)
                     dname = tmp
+            elif cnt==2:
+                irname.append(a)
             elif cnt==0:
                 if len(a)>1 and a[0]=='$':
                     irname.append(a)
@@ -3981,6 +4194,15 @@ class ActionEmitir(Action):
             ((isinstance(self.device, DeviceCT10) and \
                     'clientSessionId' in data and self.device.clientSessionId==data['clientSessionId']) or \
              isinstance(self.device, DeviceRM)) or isinstance(self.device, DeviceUpnpIR))
+            
+    def do_presend_operations(self, actionexec):
+        if self.idx<len(self.irname):
+            currentk = self.irname[self.idx]
+            if currentk.count(':')==2:
+                self.idx+=1
+                tmp = currentk.split(':')
+                event.EventManager.fire(eventname = 'ExtInsertAction',hp = (self.device.host,self.device.port),action = None,cmdline ="45 emitir %s %s:%s" % (tmp[0],tmp[1],tmp[2]))
+        return 1
 
     def handler(self,hp,data):
         if self.is_my_mac(data) and self.is_emitir_response(data):
@@ -4444,6 +4666,32 @@ class ActionCleartimers(Action):
         else:
             return 1
 
+class ActionGetstate(Action):
+    def __init__(self, device,*args, **kwargs):
+        super(ActionGetstate,self).__init__(device)
+        self.outstate = {}
+
+    def needs_subscription(self):
+        return False
+    
+    def to_json(self):
+        rv = Action.to_json(self)
+        rv.update({'outstate':self.outstate})
+        return rv
+    
+    def handler(self,hp,data):
+        if self.is_my_mac(data):
+            self.outstate = data['outstate']
+            return None if data['rv'] is None else data['rv']+1
+        else:
+            return None
+
+    def get_payload(self):
+        if isinstance(self.device,DeviceUpnpIR):
+            return 'a'
+        else:
+            return ''
+                
 class ActionGetinfo(Action):
     def __init__(self, *args, **kwargs):
         super(ActionGetinfo,self).__init__(None)

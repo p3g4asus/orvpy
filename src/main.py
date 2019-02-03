@@ -245,7 +245,11 @@ USAGE
                             prime_code = '',
                             prime_pass = ''
                             )
-
+        
+        def connect_devices(devices):
+            for _,dv in devices.copy().items():
+                dv.connect_devices(devices)
+        
         def add_discovered_devices(action,devices,mqtt_host,mqtt_port,emit_delay,**kwargs):
             for _,v in action.hosts.copy().items():
                 #print("current "+k+" nm "+v.name+" lndv "+str(len(devices)))
@@ -270,6 +274,7 @@ USAGE
                     if isinstance(v, IrManager):
                         v.set_emit_delay(emit_delay)
                     devices.update({already_saved_device.name:v})
+            connect_devices(devices)
 
         def save_modified_devices(save_filename,save_devices,debug,device,action,**kwargs):
             #print("lensv "+str(len(save_devices)))
@@ -317,8 +322,8 @@ USAGE
                     if action is not None:
                         randid = int(spl[0])
                         action.set_randomid(randid)
-                    EventManager.fire(eventname = 'ActionParsed',randid = randid,action = action)
-                    actionexec.insert_action(action)
+                        EventManager.fire(eventname = 'ActionParsed',randid = randid,action = action)
+                        actionexec.insert_action(action)
             else:
                 actionexec.insert_action(action)
                 
@@ -368,7 +373,7 @@ USAGE
             mqtt_client = mqtt_init((args.mqtt_host,args.mqtt_port),args);
 
         print(str(args))
-
+        connect_devices(args.devices)
         actionexec = ActionExecutor()
         if not args.active_on_finish:
             EventManager.on('ActionDone', terminate_on_finish,actionexec = actionexec)
