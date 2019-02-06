@@ -313,7 +313,7 @@ USAGE
             act = ActionEmitir(device,*tuple(timerobj['action'].split(' ')))
             actionexec.insert_action(act)
 
-        def insert_arrived_action(cmdline,action,devices,actionexec,**kwargs):
+        def insert_arrived_action(cmdline,action,devices,actionexec,pos = -1,**kwargs):
             if action is None:
                 spl = shlex.split(cmdline)
                 if len(spl)>1:
@@ -323,9 +323,9 @@ USAGE
                         randid = int(spl[0])
                         action.set_randomid(randid)
                         EventManager.fire(eventname = 'ActionParsed',randid = randid,action = action)
-                        actionexec.insert_action(action)
+                        actionexec.insert_action(action,pos)
             else:
-                actionexec.insert_action(action)
+                actionexec.insert_action(action,pos)
                 
         def handle_device_dl(action,devices,**kwargs):
             if action is not None:

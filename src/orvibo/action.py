@@ -2167,6 +2167,7 @@ class DeviceUpnp(Device):
     def __init__(self,hp = ('',0),mac = '',root = None,name = '',location='',deviceobj = None):
         Device.__init__(self,hp,mac,root,name)
         self.upnp_obj = deviceobj
+        self.offt = -1
         if root is None:
             self.upnp_location = location
         else:
@@ -2365,6 +2366,7 @@ class DeviceSamsungCtl(IrManager,ManTimerManager):
         else:
             self.conffile = root.attributes['conffile'].value
         self.config = None
+        self.offt = -1
         self.init_device()
         
     def ir_decode(self,irc):
@@ -2388,7 +2390,6 @@ class DeviceSamsungCtl(IrManager,ManTimerManager):
             except:
                 pass
             self.remote = None
-        self.offt = 0
     
     def init_device(self):
         now = time.time()
@@ -2403,7 +2404,7 @@ class DeviceSamsungCtl(IrManager,ManTimerManager):
                     self.config = cc
                 self.remote = samsungctl.Remote(self.config)
                 if not self.remote.open():
-                    self.remote = None
+                    self.destroy_device()
             except:
                 traceback.print_exc()
                 self.destroy_device()
@@ -2472,6 +2473,7 @@ class DeviceUpnpIR(DeviceUpnp,IrManager,ManTimerManager):
         else:
             self.ir_load = False
             self.remote_name = self.name
+        self.offt = -1
         
     def ir_decode(self,irc):
         return irc
@@ -2592,7 +2594,6 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
     
     def destroy_device(self):
         self.upnp_obj = None
-        self.offt = 0
     
     def init_device(self):
         if self.upnp_obj is None or self.a is None or len(self.dir)==0 or len(self.sources)==0:
@@ -2695,7 +2696,6 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                             rv = 255
             except:
                 traceback.print_exc()
-                self.upnp_obj = None
         elif isinstance(action, ActionGetstate):
             if self.init_device():
                 rv = 0
@@ -2723,7 +2723,8 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                         rv|=8
                     elif rv2>0:
                         rv|=16
-                    
+        if rv is None or rv!=0:
+            self.destroy_device()
         return action.handler((self.host,self.port),dict(rv=None if rv is None else rv,uid=self.mac.encode('hex'),outstate=outstate))
                 
     def get_sources_list(self):
@@ -2879,7 +2880,6 @@ class DeviceUpnpIRRC(DeviceUpnpIR):
     
     def destroy_device(self):
         self.upnp_obj = None
-        self.offt = 0
     
     def init_device(self):
         if self.upnp_obj is None or self.a is None:
@@ -3174,6 +3174,7 @@ class DeviceRM(IrManager,ManTimerManager):
         Device.__init__(self,hp,mac,root,name)
         ManTimerManager.__init__(self, root)
         IrManager.__init__(self,hp,mac,root,name)
+        self.offt = -1
         self.inner = inner
         
     def get_arduraw(self,remote,irdata):
@@ -3219,7 +3220,6 @@ class DeviceRM(IrManager,ManTimerManager):
         if rv is None or rv!=0:
             #Forzo futura riconnessione
             print("Blackbeam %s error: will try to reconnect" % self.name)
-            self.offt = 0
             self.inner = None
         return action.handler(host,dict(rv=rv,uid=mac,cmd=cmd))
 
@@ -3495,7 +3495,7 @@ class Action(object):
         now = time.time()
         if self.device is None or now-self.device.offt>self.device.offlimit:
             rv = self.runint(actionexec,returnvalue)
-            if rv is None and self.device is not None:
+            if rv is None and self.device is not None and self.device.offt>=0:
                 now = time.time()
                 self.device.offt = now
         else:
@@ -4196,12 +4196,27 @@ class ActionEmitir(Action):
              isinstance(self.device, DeviceRM)) or isinstance(self.device, DeviceUpnpIR))
             
     def do_presend_operations(self, actionexec):
+        while 1:
+            if self.idx<len(self.irname):
+                currentk = self.irname[self.idx]
+                if currentk[0]=='$':
+                    try:
+                        p = float(currentk[1:])
+                        time.sleep(p)
+                    except:
+                        pass
+                    self.idx+=1
+                else:
+                    break
+            else:
+                break
         if self.idx<len(self.irname):
             currentk = self.irname[self.idx]
             if currentk.count(':')==2:
                 self.idx+=1
                 tmp = currentk.split(':')
-                event.EventManager.fire(eventname = 'ExtInsertAction',hp = (self.device.host,self.device.port),action = None,cmdline ="45 emitir %s %s:%s" % (tmp[0],tmp[1],tmp[2]))
+                event.EventManager.fire(eventname = 'ExtInsertAction',hp = (self.device.host,self.device.port),action = None,cmdline ="45 emitir %s %s:%s" % (tmp[0],tmp[1],tmp[2]),pos = 0)
+                return 0
         return 1
 
     def handler(self,hp,data):
