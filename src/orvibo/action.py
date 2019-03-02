@@ -259,7 +259,7 @@ class SendBufferTimer(object):
                 key = self.clientinfo['key']
             rv = SendBufferTimer.handle_incoming_data(data, key)
             if rv is not None:
-                exitv = self.action.handler(self.addr,rv['msg'])
+                exitv = self.action.device.receive_handler(self.addr,self.action,rv['msg'])
                 print("exitv = "+str(exitv))
                 if exitv is not None and exitv!=RV_DATA_WAIT:
                     self.set_finished(exitv)
@@ -564,7 +564,9 @@ class TCPServer(threading.Thread):
             self.timer_ping_init()
         strout = json.dumps({'action':action,'retval':retval})+'\n'
         if device is not None and action is not None:
-            device.mqtt_publish_all(action.mqtt_publish_onfinish(retval))
+            lst = action.mqtt_publish_onfinish(retval)
+            lst.extend(device.mqtt_publish_onfinish(action,retval))
+            device.mqtt_publish_all(lst)
         self.schedulewrite(strout)
 
     def timer_ping_init(self):
@@ -743,7 +745,7 @@ class RoughParser(object):
                             returnv['disconnecttimer'] = time.time()+3*60
                 else:
                     if msgid==STATECHANGE_EXT_ID or msgid==DISCOVERY_ID:
-                        event.EventManager.fire(eventname = 'ExtChangeState',hp = hp,mac = Device.mac_from_data(data),newstate = "1" if data[-1:]==b'\x01' else "0")
+                        event.EventManager.fire(eventname = 'ExtChangeState',hp = hp,mac = DeviceUDP.mac_from_data(data),newstate = "1" if data[-1:]==b'\x01' else "0")
                     returnv['idxout'] = RoughParser.UNRECOGNIZED
             else:
                 returnv['idxout'] = RoughParser.STILL_WAIT
@@ -981,7 +983,7 @@ class UdpManager(object):
         self.buffer_l.release()
 
 
-    def _udp_transact(self,hp,payload, handler,timeout=-1, **kwargs):
+    def _udp_transact(self,hp,payload, handler,action,timeout=-1, **kwargs):
         """ Complete a UDP transaction.
         UDP is stateless and not guaranteed, so we have to
         take some mitigation steps:
@@ -1045,7 +1047,7 @@ class UdpManager(object):
                 if u.listener is None:
                     return None
                 elif buffcont:
-                    retval = handler(buffcont.addr,buffcont.data, **kwargs)
+                    retval = handler(buffcont.addr,action,buffcont.data, **kwargs)
                     #print('Handler returned '+str(retval))
                     # Return as soon as a response is received
                     if retval is not None and retval!=RV_DATA_WAIT:
@@ -1060,13 +1062,13 @@ class UdpManager(object):
                     retval = None
         if broadcast:
             u.buffer_l.acquire()
-            retval = handler(None,u.buffer, **kwargs)
+            retval = handler(None,action,u.buffer, **kwargs)
             u.buffer_l.release()
         return retval
 
     @staticmethod
     def keyfind(addr,data):
-        mac = Device.mac_from_data(data)
+        mac = DeviceUDP.mac_from_data(data)
         return mac.encode('hex') if mac else "{}:{}".format(*addr)
 
     def configure(self):
@@ -1103,11 +1105,17 @@ class Device(object):
     epoch = datetime.utcfromtimestamp(0)
     dictionary = dict()
     
+    def process_asynch_state_change(self,state):
+        pass
+    
     def connect_devices(self,device_map):
         pass
     
     def state_value_conv(self,s):
         return s
+
+    def mqtt_publish_onfinish(self,action,retval):
+        return []
 
     def mqtt_set_broker(self,hp):
         self.mqtt_stop()
@@ -1228,25 +1236,22 @@ class Device(object):
                 pass
         return devices
 
-    @staticmethod
-    def mac_from_data(data):
-        if isinstance(data, basestring):
-            idx = data.find(MAC_START)
-            if idx>=0 and idx+6<=len(data):
-                return data[idx:idx+6]
-            else:
-                return None
-        elif isinstance(data, dict) and 'uid' in data:
-            return data['uid'].decode('hex')
-        else:
-            return None
+    def do_presend_operations(self, action, actionexec):
+        if isinstance(self, ManTimerManager):
+            return ManTimerManager.do_presend_operations(self,action,actionexec)
+        return 1
 
+    def do_postsend_operations(self, action, actionexec):
+        pass
 
     def prepare_additional_file(self,root,flag):
         pass
 
     def send_action(self,actionexec,action,pay):
         return None
+    
+    def get_action_payload(self,action):
+        return ''
 
     def on_stop(self):
         self.mqtt_stop()
@@ -1356,13 +1361,268 @@ class DeviceUDP(Device):
     TIMEZONE_NOT_SET = 9000
     TIMEZONE_NONE = 70000
     OFF_AFTER_ON_NONE = 70000
+    
+    @staticmethod
+    def mac_from_data(data):
+        idx = data.find(MAC_START)
+        if idx>=0 and idx+6<=len(data):
+            return data[idx:idx+6]
+        else:
+            return None
+        
+    def is_my_mac(self,data):
+        mac = DeviceUDP.mac_from_data(data)
+        return False if not mac else mac==self.mac
+    
+    def do_presend_operations(self, action, actionexec):
+        if isinstance(action, (ActionStatechange,ActionLearnir,ActionEmitir,ActionViewtable,ActionSettable)):
+            if self.needs_resubscription():
+                actionexec.insert_action(ActionSubscribe(self),0)
+                return 0
+            self.subs_action()
+        return Device.do_presend_operations(self, action, actionexec)
+    
+    
+    @staticmethod
+    def discovery_handler(hp,action,buf,**kwargs):
+        hosts = dict()
+        for keyv, buffcont in buf.copy().items():
+            data = buffcont.data
+            if not len(data)>=41 and data[4:6] == (DISCOVERY_ID):
+                continue
+            if keyv not in hosts:
+                if data.find(DISCOVERY_ALLONE)>=0:
+                    typed = DeviceAllOne
+                elif data.find(DISCOVERY_S20)>=0:
+                    typed = DeviceS20
+                else:
+                    print("Unknown device type %s %s"% (keyv,data[31:37].encode('hex')))
+                    continue
+                dev = typed(hp = buffcont.addr, mac = data[7:13], sec1900 = struct.unpack('<I',data[37:41])[0])
+                print("Discovered device %s" % dev)
+                hosts[keyv] = dev
+                print("ln = "+str(len(hosts))+" h = "+str(keyv))
+        return hosts
+    
+    @staticmethod
+    def discovery(actionexec,timeout = 5,**kwargs):
+        return actionexec.udpmanager._udp_transact(\
+                                                   action = None,\
+                                                   hp = (None,0),\
+                                                   payload = MAGIC + DISCOVERY_LEN + DISCOVERY_ID,\
+                                                   handler = DeviceUDP.discovery_handler,\
+                                                   timeout = timeout)
 
 
     def prepare_additional_file(self,root,flag):
         self.xml_table_element(root,flag)
+        
+    @staticmethod
+    def is_subscribe_response(data):
+        return len(data)>=13 and data[4:6] == (SUBSCRIBE_ID)
+    
+    @staticmethod
+    def is_statechange_response(data):
+        return len(data)>6 and data[4:6] == (STATECHANGE_ID)
+    
+    @staticmethod
+    def is_viewtable_response(data):
+        return len(data)>=28 and data[4:6] == (VIEW_TABLE_ID)
+    
+    @staticmethod
+    def is_viewtable4_response(data):
+        return len(data)>=168 and data[4:6] == (VIEW_TABLE_ID)
+    
+    @staticmethod
+    def is_settable_response(data):
+        return len(data)>=6 and data[4:6] == (WRITE_TABLE_ID)
+    
+    @staticmethod
+    def get_ver_flag(device,table,defv):
+        stable = str(table)
+        if device and isinstance(device, DeviceUDP) and \
+            device.tablever is not None and stable in device.tablever:
+            return str(device.tablever[stable]['flgn'])
+        else:
+            return defv
+    
+    @staticmethod
+    def ip2string(ip):
+        ipp = ip.split('.')
+        if len(ipp)==4:
+            ipr = ''
+            for i in ipp:
+                try:
+                    ipr+=struct.pack('<B',int(i))
+                except:
+                    traceback.print_exc()
+                    ipr+=b'\x01'
+            return ipr
+        else:
+            return b'\x0A\x00\x00\x01'
+
+    
+    def parse_table1(self,data):
+        start = 28
+        ln = len(data)
+        self.tablever = {}
+        while start+8<=ln:
+            '''print("allv = "+data[start+2:start+8].encode('hex'))'''
+            vern = struct.unpack('<H',data[start+2:start+4])[0]
+            tabn = struct.unpack('<H',data[start+4:start+6])[0]
+            flgn = struct.unpack('<H',data[start+6:start+8])[0]
+            tabns = str(tabn)
+            self.tablever[tabns] = {}
+            self.tablever[tabns]['vern'] = vern
+            self.tablever[tabns]['flgn'] = flgn
+            start+=8
+            
+    def parse_timer_record(self,rec):
+        tcode = struct.unpack('<H',rec[2:4])[0]
+        swAction = 0 if rec[20:21] == b'\x00' else 1
+        year = struct.unpack('<H',rec[22:24])[0]
+        month = struct.unpack('<B',rec[24:25])[0]
+        day = struct.unpack('<B',rec[25:26])[0]
+        h = struct.unpack('<B',rec[26:27])[0]
+        m = struct.unpack('<B',rec[27:28])[0]
+        s = struct.unpack('<B',rec[28:29])[0]
+        rep = struct.unpack('<B',rec[29:30])[0]
+        self.timers.append(dict(code = tcode,action = swAction,rep = rep, hour = h, minute = m, second = s, year = year,month = month, day = day))
+
+    def parse_table3(self,data):
+        start = 28
+        ln = len(data)
+        self.timers = []
+        while start<ln:
+            lenrec = struct.unpack('<H',data[start:start+2])[0]
+            rec = data[start:start+2+lenrec]
+            self.parse_timer_record(rec)
+            start+=2+lenrec
+            
+    def parse_table4(self,data):
+        if len(self.name)==0 or self.name==self.default_name():
+            strname = data[70:86].replace(b'\xff','').replace(b'\x00','').strip()
+            if len(strname):
+                self.name = strname
+        timerSetString = struct.unpack('<B',data[164:165])[0]
+        timerValString = struct.unpack('<H',data[166:168])[0]
+        self.timer_off_after_on = 0 if not timerSetString else timerValString
+        tzS = struct.unpack('<B',data[162:163])[0]
+        tz  = struct.unpack('<B',data[163:164])[0]
+        self.timezone = DeviceUDP.TIMEZONE_NOT_SET if tzS else tz
+    
+    def process_response(self,hp,action,data,**kwargs):
+        out = dict(rv=None,data=None)
+        if isinstance(action, ActionSubscribe) and DeviceUDP.is_subscribe_response(data) and self.is_my_mac(data):
+            self.process_subscribe(data)
+            self.subs_action()
+            out['rv'] = 1
+        elif isinstance(action, ActionViewtable) and \
+            (DeviceUDP.is_viewtable_response(data) or DeviceUDP.is_viewtable4_response(data)) and \
+            struct.unpack('<B',data[23])[0]==action.tablenum and self.is_my_mac(data):
+            if self.rawtables is None:
+                self.rawtables = dict()
+            self.rawtables[str(action.tablenum)] = data
+            if isinstance(action, ActionViewtable1):
+                self.parse_table1(data)
+            elif isinstance(action, ActionViewtable3):
+                self.parse_table3(data)
+            else:
+                self.parse_table4(data)
+            out['rv'] = 1
+        elif isinstance(action, ActionSettable) and \
+            DeviceUDP.is_settable_response(data) and \
+            self.is_my_mac(data):
+            out['rv'] = 1
+        elif isinstance(action, ActionStatechange) and DeviceUDP.is_statechange_response(data) and self.is_my_mac(data):
+            out['rv'] = 1
+        return out
+    
+    def receive_handler(self,hp,action,data,**kwargs):
+        out = self.process_response(hp, action, data)
+        return action.exec_handler(**out)
 
     def send_action(self,actionexec,action,pay):
-        return actionexec.udpmanager._udp_transact(action = action,hp = (self.host,self.port),payload = pay,handler = Action.handler_s,timeout = action.get_timeout())
+        return actionexec.udpmanager._udp_transact(action = action,hp = (self.host,self.port),payload = pay,handler = self.receive_handler,timeout = action.get_timeout())
+    
+    def get_table3_record(self,action):
+        if action.datetime is None:
+            return struct.pack('<H',action.timerid)
+        else:
+            if action.timerid is None or action.timerid<0:
+                timerid = 1
+                while True:
+                    repeat = False
+                    for t in self.timers:
+                        if t['code']==timerid:
+                            timerid+=1
+                            repeat = True
+                            break
+                    if not repeat:
+                        break
+            else:
+                timerid = action.timerid
+
+            record = struct.pack('<H',timerid) + PADDING_1 + PADDING_1\
+                + '\x20\x20\x20\x20' + struct.pack('<H',action.action) + struct.pack('<H',action.datetime.year)\
+                + struct.pack('<B',action.datetime.month) + struct.pack('<B',action.datetime.day)\
+                + struct.pack('<B',action.datetime.hour) + struct.pack('<B',action.datetime.minute)\
+                + struct.pack('<B',action.datetime.second) + struct.pack('<B',action.rep)
+
+            return record
+    
+    def get_table4_record(self,action):
+        if self.rawtables is None or "4" not in self.rawtables:
+            return ''
+        else:
+            pay = self.rawtables["4"]
+            lenrec = struct.unpack('<H',pay[28:30])[0]
+            record = pay[30:30+lenrec]
+
+
+            if action.name is None:
+                nm = None
+            elif len(action.name)>16:
+                nm = action.name[0:16]
+            else:
+                nm = action.name.ljust(16)
+            if nm is not None:
+                record = record[0:40]+nm+record[56:]
+            if action.ip is not None:
+                record = record[0:118]+DeviceUDP.ip2string(action.ip)+DeviceUDP.ip2string(action.gateway)+DeviceUDP.ip2string(action.nmask)+b'\x00\x01'+record[132:]
+            if action.timezone is not None:
+                record = record[0:132]+(b'\x01\x00' if action.timezone==DeviceUDP.TIMEZONE_NOT_SET else b'\x00'+struct.pack('<b',action.timezone))+record[134:]
+            if action.timer_off_after_on is not None:
+                record = record[0:134]+(b'\x00\xff' if action.timer_off_after_on<=0 else b'\x01\x00')+struct.pack('<H',action.timer_off_after_on)+record[138:]
+            return record
+
+#concetto di handler dopo send_action rimane ma  ha come parametri rv (valore di ritorno e data che dipende dall'azione')
+#l'handler esegue quello che deve con il data controllando rv. ritorna il valore che deve in vase ad rv (valore ok 0)'    
+    def get_action_payload(self, action):
+        if isinstance(action, ActionSubscribe):
+            return MAGIC + SUBSCRIBE_LEN + SUBSCRIBE_ID + self.mac \
+            + PADDING_1 + self.mac_reversed + PADDING_1
+        elif isinstance(action, ActionStatechange):
+            newst = self.state_value_conv(action.newstate)
+            return MAGIC + STATECHANGE_LEN + STATECHANGE_ID + self.mac + PADDING_1\
+                + PADDING_2+(b'\x01' if newst!="0" else b'\x00')
+        elif isinstance(action, ActionViewtable):
+            return MAGIC + VIEW_TABLE_LEN + VIEW_TABLE_ID + self.mac + PADDING_1\
+            + PADDING_2+struct.pack('<B',action.tablenum)+b'\x00'+struct.pack('<B',action.vflag)+PADDING_2
+        elif isinstance(action, ActionSettable):
+            if isinstance(action, ActionSettable4):
+                record = self.get_table4_record(action)
+            else:
+                record = self.get_table3_record(action)
+            if len(record):
+                pay = WRITE_TABLE_ID + self.mac + PADDING_1\
+                        + PADDING_2 + struct.pack('<H',action.tablenum)+struct.pack('<B',action.actionid)
+    
+                if action.actionid!=DELRECORD_CODE:
+                    pay+=struct.pack('<H',len(record))
+                pay+=record
+                return MAGIC+struct.pack('>H',len(pay)+4)+pay
+        return Device.get_action_payload(self, action)
 
     def __init__(self,hp = ('',0),mac = '',root = None,timeout = DEFAULT_RESUBSCRIPTION_TIMEOUT,name = '',sec1900 = 0,lsa_timeout=DEFAULT_RESUBSCRIPTION_STIMEOUT, **kw):
         Device.__init__(self,hp,mac,root,name)
@@ -1490,8 +1750,32 @@ class DeviceS20(DeviceUDP):
         #else:
         #    self.state = int(root.attributes['state'].value)
         
+    def process_asynch_state_change(self,state):
+        self.state = state
+        
+    def mqtt_publish_onfinish(self, action, retval):
+        if isinstance(action, (ActionSubscribe,ActionNotifystate)):
+            return self.mqtt_power_state()
+        else:
+            return DeviceUDP.mqtt_publish_onfinish(self, action, retval)
+        
     def state_value_conv(self,s):
         return "1" if s!="0" else "0"
+    
+    def do_presend_operations(self, action, actionexec):
+        if isinstance(action, ActionSettable3):
+            if self.timers is None:
+                act = ActionViewtable3(self)
+                act.m_device = False
+                actionexec.insert_action(act,0)
+                return 0
+        return DeviceUDP.do_presend_operations(self, action, actionexec)
+    
+    def do_postsend_operations(self, action, actionexec):
+        if isinstance(action, ActionStatechange):
+            actionexec.insert_action(ActionSubscribe(self),1)
+        else:
+            DeviceUDP.do_postsend_operations(self, action, actionexec)
 
     def copy_extra_from(self,already_saved_device):
         DeviceUDP.copy_extra_from(self,already_saved_device)
@@ -1552,6 +1836,11 @@ class ManTimerManager(object):
 
     def to_json(self):
         return {}
+    
+    def do_presend_operations(self, action, actionexec):
+        if isinstance(action, ActionSettable3):
+            self.manage_timer(datetime_o = action.datetime,rep = action.rep,action = action.action,timerid = action.timerid,actionid = action.actionid)
+        return 1
 
     def copy_extra_from(self,already_saved_device):
         self.timers_man = already_saved_device.timers_man
@@ -1744,6 +2033,26 @@ class IrManager(Device):
     def schedule_action(self,topic,convert,*args):
         event.EventManager.fire(eventname = 'ExtInsertAction',hp = (self.host,self.port),cmdline ="",  \
                             action = ActionBackup(self,topic,convert))
+    
+    def send_action(self, actionexec, action, pay):
+        if isinstance(action, ActionStatechange):
+            return action.exec_handler(1,None)
+        else:
+            return Device.send_action(self, actionexec, action, pay)
+        
+    def do_presend_operations(self, action, actionexec):
+        if isinstance(action,ActionStatechange):
+            actionexec.insert_action(ActionEmitir(self,action.newstate),0)
+            return 1
+        elif isinstance(action,ActionLearnir):
+            if self.backupstate==0 and action.asked<action.idx:
+                action.asked+=1
+                actionexec.insert_action(ActionIrask(self,action.irname[action.asked]),0)
+                return 0
+            else:
+                return 1
+        else:
+            return Device.do_presend_operations(self, action, actionexec)
     
     def on_stop(self):
         Device.on_stop(self)
@@ -2057,13 +2366,38 @@ class DeviceVirtual(Device):
             except:
                 traceback.print_exc()
                 pass
-            
+                       
     def get_last_target_from_state(self):
         d2 = []
         if self.state in self.states_map:
             for t in self.states_map[self.state]:
                 d2.append(t["d"])
         return d2
+    
+    def get_action_payload(self, action):
+        if isinstance(action, ActionStatechange):
+            return self.state_value_conv(action.newstate)
+        else:
+            return Device.get_action_payload(self, action)
+        
+    def do_presend_operations(self, action, actionexec):
+        if isinstance(action,ActionStatechange):
+            if action.newstate in action.states_map:
+                i = 0
+                for act in self.states_map[action.newstate]:
+                    realdev = self.get_real_dev(act)
+                    for d in realdev:
+                        randid = 8950+i
+                        i+=1
+                        actcmd = "%d statechange %s %s" % (randid,d,act["s"])
+                        print("Scheduling "+actcmd)
+                        event.EventManager.fire(eventname = 'ExtInsertAction',\
+                                                cmdline = actcmd,action = None)
+                self.state = action.newstate
+                return 1
+            else:
+                return None
+        return Device.do_presend_operations(self, action, actionexec)
             
     def get_real_dev(self,el):
         d = el['d']
@@ -2144,12 +2478,11 @@ class DeviceVirtual(Device):
         return rv
     
     def send_action(self, actionexec, action, state):
-        mac = self.mac.encode('hex')
         if isinstance(action,ActionStatechange):
-            rv = 1
+            return action.exec_handler(1,None)
         else:
-            rv = None
-        return action.handler((self.host,self.port),dict(rv=rv,uid=mac))
+            return Device.send_action(self, actionexec, action, state)
+        
 
 class DeviceUpnp(Device):
     
@@ -2163,7 +2496,7 @@ class DeviceUpnp(Device):
             replace(']',' ').\
             replace('(',' ').\
             replace(')',' ')
-    
+       
     def __init__(self,hp = ('',0),mac = '',root = None,name = '',location='',deviceobj = None):
         Device.__init__(self,hp,mac,root,name)
         self.upnp_obj = deviceobj
@@ -2188,6 +2521,9 @@ class DeviceUpnp(Device):
         rv.update({'upnp_location':self.upnp_location})
         return rv
     
+    def copy_extra_from(self, already_saved_device):
+        Device.copy_extra_from(self, already_saved_device)
+        self.upnp_location = already_saved_device.upnp_location
     
     @staticmethod
     def get_name(d):
@@ -2202,7 +2538,7 @@ class DeviceUpnp(Device):
         return DeviceUpnp.correct_upnp_name(rv)
         
     @staticmethod
-    def discover(timeout=5):
+    def discovery(timeout=5):
         out = {}
         try:
             print("Searching upnp devices")
@@ -2372,6 +2708,12 @@ class DeviceSamsungCtl(IrManager,ManTimerManager):
     def ir_decode(self,irc):
         return irc
     
+    def get_action_payload(self, action):
+        if isinstance(action, ActionEmitir):
+            return action.irdata
+        else:
+            return IrManager.get_action_payload(self, action)
+    
     def fill_ir_list(self):
         dc = {k:(v,k,{'type':DeviceSamsungCtl.CTL_KEY}) for k,v in samsung_mappings.iteritems()}
         k = dc.keys()
@@ -2440,8 +2782,6 @@ class DeviceSamsungCtl(IrManager,ManTimerManager):
         return rv
     
     def send_action(self,actionexec,action,pay):
-        rv = None
-        mac = self.mac
         if isinstance(action, ActionEmitir):
             try:
                 if self.init_device():
@@ -2450,13 +2790,13 @@ class DeviceSamsungCtl(IrManager,ManTimerManager):
                         rv = 5
                         self.destroy_device()
                     else:
-                        rv = 0
+                        rv = 1
             except:
                 traceback.print_exc()
                 self.destroy_device()
-            if "mac" in pay[2]:
-                mac = pay[2]["mac"]
-        return action.handler((self.host,self.port),dict(rv=None if rv is None else rv,uid=mac.encode('hex')))
+            return action.exec_handler(rv,None)
+        else:
+            return IrManager.send_action(self, actionexec, action, pay)
     
 class DeviceUpnpIR(DeviceUpnp,IrManager,ManTimerManager):
     NUMBER_KEY = "1"
@@ -2480,6 +2820,14 @@ class DeviceUpnpIR(DeviceUpnp,IrManager,ManTimerManager):
 
     def ir_encode(self,irc):
         return irc
+    
+    def get_action_payload(self, action):
+        if isinstance(action, ActionGetstate):
+            return 'a'
+        elif isinstance(action, ActionEmitir):
+            return action.irdata
+        else:
+            return DeviceUpnp.get_action_payload(self, action)
         
     def copy_extra_from(self,already_saved_device):
         DeviceUpnp.copy_extra_from(self,already_saved_device)
@@ -2660,7 +3008,7 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                 
     def send_action(self,actionexec,action,pay):
         rv = None
-        outstate = dict()
+        outstate = None        
         if isinstance(action, ActionEmitir):
             try:
                 tp = pay[2]["type"]
@@ -2677,7 +3025,7 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                         if pay[0] in self.channels:
                             vv = self.a["SetMainTVChannel"](**self.channels[pay[0]].as_params(self.channel_list_type,self.channel_satellite_id))
                             if 'Result' in vv and vv['Result']=="OK":
-                                rv = 0
+                                rv = 1
                             else:
                                 print("Change channel rv "+str(vv))
                                 rv = 127
@@ -2688,7 +3036,7 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                         if pay[0] in self.sources:
                             vv = self.a["SetMainTVSource"](**self.sources[pay[0]].as_params())
                             if 'Result' in vv and vv['Result']=="OK":
-                                rv = 0
+                                rv = 1
                             else:
                                 print("Change source rv "+str(vv))
                                 rv = 127
@@ -2697,8 +3045,9 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
             except:
                 traceback.print_exc()
         elif isinstance(action, ActionGetstate):
+            outstate = dict()
             if self.init_device():
-                rv = 0
+                rv = 1
                 try:
                     vv = self.a["GetCurrentMainTVChannel"]()
                     if 'Result' in vv and vv['Result']=="OK":
@@ -2723,9 +3072,10 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                         rv|=8
                     elif rv2>0:
                         rv|=16
-        if rv is None or rv!=0:
+        if rv is None or rv!=1:
             self.destroy_device()
-        return action.handler((self.host,self.port),dict(rv=None if rv is None else rv,uid=self.mac.encode('hex'),outstate=outstate))
+        return action.exec_handler(rv,outstate) if isinstance(action, (ActionEmitir,ActionGetstate))\
+            else DeviceUpnpIR.send_action(self, actionexec, action, pay)
                 
     def get_sources_list(self):
         if not len(self.sources):
@@ -2851,8 +3201,6 @@ class DeviceUpnpIRRC(DeviceUpnpIR):
 
     def send_action(self,actionexec,action,pay):
         cmd = {}
-        outstate = {}
-        mac = self.mac
         dt = None
         if isinstance(action, ActionEmitir):
             tp = pay[2]["type"]
@@ -2870,13 +3218,13 @@ class DeviceUpnpIRRC(DeviceUpnpIR):
                 else:
                     dt = 0
                     cmd[k] = v
-            if "mac" in pay[2]:
-                mac = pay[2]["mac"]
         elif isinstance(action, ActionGetstate):
             dt = self.get_states()
-            outstate.update(self.states)
-                    
-        return action.handler((self.host,self.port),dict(rv=None if dt is None else dt,uid=mac.encode('hex'),cmd=cmd))
+            cmd.update(self.states)
+        if dt is not None:
+            dt+=1
+        return action.exec_handler(dt,cmd) if isinstance(action, (ActionGetstate,ActionEmitir))\
+            else DeviceUpnpIR.send_action(self, actionexec, action, pay)
     
     def destroy_device(self):
         self.upnp_obj = None
@@ -2980,6 +3328,12 @@ class DevicePrimelan(Device):
         else:
             return s
     
+    def get_action_payload(self, action):
+        if isinstance(action, ActionStatechange):
+            return self.state_value_conv(action.newstate)
+        else:
+            return Device.get_action_payload(self, action)
+    
     crc16_table = [\
         0x0000,0xc0c1,0xc181,0x0140,0xc301,0x03c0,0x0280,0xc241,\
         0xc601,0x06c0,0x0780,0xc741,0x0500,0xc5c1,0xc481,0x0440,\
@@ -3020,7 +3374,7 @@ class DevicePrimelan(Device):
         return reduce(lambda x,y: ((x >> 8) & 0xff) ^ DevicePrimelan.crc16_table[(x ^ y) & 0xff],ba,0)
     
     @staticmethod
-    def discover(hp,passw,codu,port2,timeout=10):
+    def discovery(hp,passw,codu,port2,timeout=10):
         try:
             r = requests.post('http://{}:{}/cgi-bin/web.cgi'.format(*hp), \
                   data={'pass': passw, 'code': codu, 'mod': 'auth'},timeout = timeout)
@@ -3136,14 +3490,13 @@ class DevicePrimelan(Device):
         return rv
     
     def send_action(self, actionexec, action, pay):
-        mac = self.mac.encode('hex')
-        timeout = action.get_timeout()
-        if timeout is None or timeout<0:
-            timeout = actionexec.udpmanager.timeout
-        if timeout<0:
-            timeout = None
-        try:
-            if isinstance(action,ActionStatechange):
+        if isinstance(action,ActionStatechange):
+            timeout = action.get_timeout()
+            if timeout is None or timeout<0:
+                timeout = actionexec.udpmanager.timeout
+            if timeout<0:
+                timeout = None
+            try:           
                 state = int(pay)
                 rv = self.change_state_tcp(state,timeout)
                 if rv==1:
@@ -3151,12 +3504,12 @@ class DevicePrimelan(Device):
                     if st>0 and st<=100:
                         self.oldstate = self.state
                     self.state = pay
-            else:
-                rv = 4
-        except:
-            traceback.print_exc()
-            rv = None
-        return action.handler((self.host,self.port),dict(rv=rv,uid=mac,state=self.state))
+            except:
+                traceback.print_exc()
+                rv = None
+            return action.exec_handler(rv,self.state)
+        else:
+            return Device.send_action(self, actionexec, action, pay)
             
 class DeviceRM(IrManager,ManTimerManager):
     
@@ -3169,6 +3522,26 @@ class DeviceRM(IrManager,ManTimerManager):
             traceback.print_exc()
             self.inner = None
             
+    def get_action_payload(self, action):
+        if isinstance(action, ActionLearnir):
+            return action.irdata
+        elif isinstance(action, ActionEmitir):
+            return action.irdata
+        else:
+            return IrManager.get_action_payload(self, action)
+          
+    @staticmethod
+    def discovery(actionexec,timeout,**kwargs):
+        hosts = dict()
+        dev3 = broadlink.discover(timeout=timeout,timeout2 = actionexec.udpmanager.timeout if actionexec.udpmanager.timeout>0 else None)
+        for d in dev3:
+            if d.auth():
+                keyv = '{}:{}'.format(*d.host)
+                hosts[keyv] = DeviceRM(\
+                                            hp = d.host,\
+                                            mac = str(d.mac),\
+                                            root = None,name = '',inner = d)
+        return hosts
     
     def __init__(self,hp = ('',0),mac = '',root = None,name = '',inner = None):
         Device.__init__(self,hp,mac,root,name)
@@ -3184,44 +3557,61 @@ class DeviceRM(IrManager,ManTimerManager):
         return (lircbroadlink.lirc2broadlink(msg['a']),msg['key'],{})
 
     def send_action(self, actionexec, action, pay):
-        mac = self.mac.encode('hex')
-        if self.inner is None:
-            self.inner_init()
+        if isinstance(action,(ActionEmitir,ActionLearnir)):
             if self.inner is None:
-                return action.handler(self.host,\
-                    dict(rv=None,uid=mac,cmd=25 if isinstance(action, ActionLearnir) else 15))
-        timeout = action.get_timeout()
-        if timeout is None or timeout<0:
-            timeout = actionexec.udpmanager.timeout
-        if timeout<0:
-            timeout = None
-        self.inner.timeout = timeout
-        try:
-            if isinstance(action, ActionLearnir):
-                cmd = 25
-                response = self.inner.enter_learning()
-                if response is None:
-                    rv = None
+                self.inner_init()
+                if self.inner is None:
+                    return action.exec_handler(None,None)
+            data = None
+            timeout = action.get_timeout()
+            if timeout is None or timeout<0:
+                timeout = actionexec.udpmanager.timeout
+            if timeout<0:
+                timeout = None
+            self.inner.timeout = timeout
+            try:
+                if isinstance(action, ActionLearnir):
+                    response = self.inner.enter_learning()
+                    if response is None:
+                        rv = None
+                    else:
+                        rv=response[0x22] | (response[0x23] << 8)
+                        time.sleep(self.inner.timeout)
+                        data2 = self.inner.check_data()
+                        if data2 is None or isinstance(data2, int):
+                            data = {'irc':None,'attrs':None}
+                            rv = data2
+                        else:
+                            if data2[0]=='\x26':
+                                freq = 38000
+                            elif data2[0]=='\xb2':
+                                freq = 433000000
+                            elif data2[0]=='\xd7':
+                                freq = 315000000
+                            else:
+                                freq = 0
+                            data = {'irc':data2,'attrs':{'freq':freq}}
                 else:
-                    rv=response[0x22] | (response[0x23] << 8)
-                    cmd = 116
+                    print ("S(%s:%d)-> %s" % (self.inner.host+(pay[0].encode('hex'),)))
+                    response = self.inner.send_data(pay[0])
+                    if response is None:
+                        rv = None
+                    else:
+                        rv=response[0x22] | (response[0x23] << 8)
+            except:
+                traceback.print_exc()
+                rv = None
+            if rv is None or rv!=0:
+                #Forzo futura riconnessione
+                print("Blackbeam %s error: will try to reconnect" % self.name)
+                self.inner = None
+                if rv!=0:
+                    rv+=600
             else:
-                cmd = 15
-                print ("S(%s:%d)->" % self.inner.host)+pay.encode('hex')
-                response = self.inner.send_data(pay)
-                if response is None:
-                    rv = None
-                else:
-                    rv=response[0x22] | (response[0x23] << 8)
-        except:
-            traceback.print_exc()
-            rv = None
-        host = self.inner.host
-        if rv is None or rv!=0:
-            #Forzo futura riconnessione
-            print("Blackbeam %s error: will try to reconnect" % self.name)
-            self.inner = None
-        return action.handler(host,dict(rv=rv,uid=mac,cmd=cmd))
+                rv+=1
+            return action.exec_handler(rv,data)
+        else:
+            return IrManager.send_action(self, actionexec, action, pay)
 
     def copy_extra_from(self,already_saved_device):
         savep = self.port
@@ -3265,6 +3655,27 @@ class DeviceRM(IrManager,ManTimerManager):
         return irc
 
 class DeviceCT10(IrManager,ManTimerManager):
+    
+    @staticmethod
+    def is_learnir_intermediate_response(data):
+        return data["cmd"]==25
+    
+    def receive_handler(self,hp,action,data,**kwargs):
+        if isinstance(action, ActionLearnir):
+            if DeviceCT10.is_learnir_intermediate_response(data):
+                return action.exec_handler(RV_DATA_WAIT,None)
+            else:
+                attrs = dict()
+            if 'freq' in data:
+                attrs['freq'] = data['freq']
+            if 'pluse' not in data:
+                return action.exec_handler(None,None)
+            else:
+                return action.exec_handler(1, {'irc': data['pluse'],'attrs':attrs})
+        elif isinstance(action, ActionEmitir):
+            if 'clientSessionId' in data and self.clientSessionId==data['clientSessionId']:
+                return action.exec_handler(1,data)
+        return action.exec_handler(None,None)
 
     def __init__(self,hp = ('',0),mac = '',root = None,name = '',key = PK_KEY,password = '',deviceid = '',clientsessionid='',hp2 = ('',0)):
         Device.__init__(self,hp,mac,root,name)
@@ -3291,9 +3702,54 @@ class DeviceCT10(IrManager,ManTimerManager):
             #self.dir_file_min(self.dir)
             #self.sh_file_min(self.sh)
 
+    def get_action_payload(self, action):
+        if isinstance(action, ActionLearnir):
+            if len(action.irdata):
+                fk = action.irdata[action.irdata.find(':')+1:].translate(None, '!@#$/\+-_')
+                if len(fk)<2:
+                    fk = SendBufferTimer.generatestring(5);
+                cmd = collections.OrderedDict()
+                cmd['fKey'] = fk
+                cmd['fid'] = self.get_fid()
+                cmd['uid'] = self.mac.encode('hex')
+                cmd['cmd'] = 25
+                cmd['order'] = 'ir control'
+                cmd['lastUpdateTime'] = int(Device.unix_time_millis(datetime.now())/1000.0)
+                cmd['clientSessionId'] = self.clientSessionId
+                cmd['serial'] = None
+                cmd['deviceId'] = self.deviceId
+                cmd['fName'] = fk
+                return cmd
+        elif isinstance(action, ActionEmitir):
+            if len(action.irdata):
+                cmd = collections.OrderedDict()
+                cmd['uid'] = self.mac.encode('hex')
+                cmd['defaultResponse'] = 1
+                cmd['delayTime'] = 0
+                cmd['qualityOfService'] = 1
+                cmd['clientSessionId'] = self.clientSessionId
+                cmd.update(action.irdata[2])
+                cmd['pluseNum'] = action.irdata[0].count(',')+1
+                cmd['value1'] = 0
+                cmd['value2'] = 0
+                cmd['value3'] = 0
+                cmd['value4'] = 0
+                cmd['cmd'] = 15
+                cmd['order'] = 'ir control'
+                #cmd['userName'] = 'fulminedipegasus@gmail.com'
+                cmd['pluseData'] = action.irdata[0]
+                cmd['serial'] = None
+                cmd['deviceId'] = self.deviceId
+                return cmd
+        return IrManager.get_action_payload(self, action)
+    
     def get_fid(self):
         self.fid+=1
         return self.fid
+    
+    @staticmethod
+    def discovery(actionexec,timeout,**kwargs):
+        return actionexec.tcpserver.get_connected_clients()
     
     def get_arduraw(self,remote,irdata):
         out = []
@@ -3309,11 +3765,14 @@ class DeviceCT10(IrManager,ManTimerManager):
         return (out[:-1],msg['key'],{'freq':38000})
 
     def send_action(self, actionexec, action, pay):
-        buf = SendBufferTimer(pay,action,(self.host,self.port),self.mac,actionexec)
-        if actionexec.tcpserver.schedulewrite(buf):
-            return RV_ASYNCH_EXEC
+        if isinstance(action,(ActionEmitir,ActionLearnir)):
+            buf = SendBufferTimer(pay,action,(self.host,self.port),self.mac,actionexec)
+            if actionexec.tcpserver.schedulewrite(buf):
+                return RV_ASYNCH_EXEC
+            else:
+                return None
         else:
-            return None
+            return IrManager.send_action(self, actionexec, action, pay)
 
     def copy_extra_from(self,already_saved_device):
         savep = self.port
@@ -3415,6 +3874,45 @@ class DeviceAllOne(DeviceUDP,ManTimerManager,IrManager):
         rv.update(IrManager.to_json(self))
         rv.update(ManTimerManager.to_json(self))
         return rv
+    
+    @staticmethod
+    def is_learnir_response(data):
+        return len(data)>=6 and data[4:6] == (LEARNIR_ID)
+    
+    @staticmethod
+    def is_learnir_intermediate_response(data):
+        return data[2:4]==LEARNIR_LEN
+    
+    @staticmethod
+    def is_emitir_response(data):
+        return len(data)>=6 and data[4:6] == (EMITIR_ID)
+    
+    def get_action_payload(self, action):
+        if isinstance(action, ActionLearnir):
+            if len(action.irdata):
+                return MAGIC + LEARNIR_LEN + LEARNIR_ID + self.mac + PADDING_1\
+                    + LEARNIR_2
+        elif isinstance(action, ActionEmitir):
+            if len(action.irdata):
+                irc = action.irdata[0]
+                plen = struct.pack('>H',len(irc)+26)
+                ilen = struct.pack('<H',len(irc))
+                rnd = struct.pack('<H',randint(0,65535))
+                return MAGIC + plen + EMITIR_ID + self.mac + PADDING_1\
+                    + EMITIR_2 + rnd + ilen + irc
+        else:
+            return DeviceUDP.get_action_payload(self, action)
+    
+    def process_response(self, hp, action, data, **kwargs):
+        if isinstance(action, ActionLearnir) and self.is_my_mac(data) and DeviceAllOne.is_learnir_response(data):
+            if DeviceAllOne.is_learnir_intermediate_response(data):
+                return dict(rv=RV_DATA_WAIT,data=None)
+            else:
+                return dict(rv=1,data={'irc':data[26:],'attrs':{}})
+        elif isinstance(action, ActionEmitir) and self.is_my_mac(data) and DeviceAllOne.is_emitir_response(data):
+            return dict(rv=1,data=None)
+        else:
+            return DeviceUDP.process_response(self, hp, action, data, **kwargs)
 
     def copy_extra_from(self,already_saved_device):
         DeviceUDP.copy_extra_from(self,already_saved_device)
@@ -3468,28 +3966,14 @@ class Action(object):
                 'dev':1 if self.modifies_device() else 0
                 }
 
-    def is_my_mac(self,data):
-        mac = Device.mac_from_data(data)
-        return False if not mac else mac==self.device.mac
-
-    def get_payload(self):
-        return ''
-
     def mqtt_publish_onfinish(self,rv):
         return list()
 
-    def handler(self,hp,data):
-        return 1
+    def exec_handler(self,rv,data,**kwargs):
+        return rv
 
     def get_timeout(self):
         return None
-
-    def needs_subscription(self):
-        return True
-
-    @staticmethod
-    def handler_s(hp,data,**kwargs):
-        return kwargs['action'].handler(hp,data)
 
     def run(self, actionexec, returnvalue = RV_NOT_EXECUTED):
         now = time.time()
@@ -3516,21 +4000,25 @@ class Action(object):
 
     def runint(self, actionexec, returnvalue = RV_NOT_EXECUTED):
         if returnvalue==RV_NOT_EXECUTED:
-            if isinstance(self.device, DeviceUDP) and self.needs_subscription():
-                if self.device.needs_resubscription():
-                    actionexec.insert_action(ActionSubscribe(self.device),0)
-                    return 0
-                self.device.subs_action()
             retval = self.do_presend_operations(actionexec)
             if retval>0:
-                pay = self.get_payload()
+                pay = ''
+                if self.device:
+                    retval = self.device.do_presend_operations(self, actionexec)
+                    if retval>0:
+                        pay = self.device.get_action_payload(self)
+
                 if pay is not None and len(pay):
                     retval = self.device.send_action(actionexec,self,pay)
                 if retval>0:
+                    if self.device:
+                        self.device.do_postsend_operations(self, actionexec)
                     self.do_postsend_operations(actionexec)
         else:
             retval = returnvalue
             if retval>0:
+                if self.device:
+                    self.device.do_postsend_operations(self, actionexec)
                 self.do_postsend_operations(actionexec)
         return retval
 
@@ -3541,41 +4029,12 @@ class ActionPingresponse(Action):
     def modifies_device(self):
         return False
 
-    def needs_subscription(self):
-        return False
-
 class ActionPing(ActionPingresponse):
     def __init__(self,*args,**kwargs):
         super(ActionPing, self).__init__(None)
 
 class ActionSubscribe(Action):
-    def needs_subscription(self):
-        return False
-
-    def is_subscribe_response(self,data):
-        return len(data)>=13 and data[4:6] == (SUBSCRIBE_ID)
-
-    def handler(self,hp,data):
-        if self.is_my_mac(data) and self.is_subscribe_response(data):
-            self.device.process_subscribe(data)
-            self.device.subs_action()
-            return 1
-        else:
-            return None
-
-    def mqtt_publish_onfinish(self,rv):
-        if isinstance(self.device,DeviceS20):
-            return self.device.mqtt_power_state()#lista di dict con topic msg e options(retain, qos)
-        else:
-            return list()
-
-    def get_payload(self):
-        if isinstance(self.device, DeviceCT10) or isinstance(self.device, DeviceRM) or isinstance(self.device, DeviceUpnp):
-            return ''
-        else:
-            return MAGIC + SUBSCRIBE_LEN + SUBSCRIBE_ID + self.device.mac \
-            + PADDING_1 + self.device.mac_reversed + PADDING_1
-
+    pass
 
 class ActionDiscovery(Action):
 
@@ -3596,66 +4055,27 @@ class ActionDiscovery(Action):
 
     def modifies_device(self):
         return self.m_device
-
-    def needs_subscription(self):
-        return False
-
-    def is_discovery_response(self,data):
-        return len(data)>=41 and data[4:6] == (DISCOVERY_ID)
-
-    def do_presend_operations(self, actionexec):
-        dev2 = actionexec.tcpserver.get_connected_clients()
-        self.hosts.update(dev2)
+    
+    def runint(self, actionexec, returnvalue=RV_NOT_EXECUTED):
         timeout = self.get_timeout()
         if timeout is None or timeout<0:
             timeout = actionexec.udpmanager.timeout
         if timeout<0:
             timeout = None
-        dev3 = broadlink.discover(timeout=timeout,timeout2 = actionexec.udpmanager.timeout if actionexec.udpmanager.timeout>0 else None)
-        for d in dev3:
-            if d.auth():
-                keyv = '{}:{}'.format(*d.host)
-                self.hosts[keyv] = DeviceRM(\
-                                            hp = d.host,\
-                                            mac = str(d.mac),\
-                                            root = None,name = '',inner = d)
+        self.hosts.update(DeviceCT10.discovery(actionexec, timeout))
+        self.hosts.update(DeviceRM.discovery(actionexec, timeout))
         php = self.php if len(self.php[0]) else actionexec.prime_hp
         ppasw = self.ppasw if len(self.ppasw) else actionexec.prime_pass
         pcodu = self.pcodu if len(self.pcodu) else actionexec.prime_code
         pport2 = self.pport2 if self.pport2 else actionexec.prime_port2
         if len(php[0]) and len(ppasw) and len(pcodu):
-            self.hosts.update(DevicePrimelan.discover(php, ppasw, pcodu, pport2, timeout))
-        self.hosts.update(DeviceUpnp.discover())
-        return Action.do_presend_operations(self, actionexec)
+            self.hosts.update(DevicePrimelan.discovery(php, ppasw, pcodu, pport2, timeout))
+        self.hosts.update(DeviceUpnp.discovery())
+        self.hosts.update(DeviceUDP.discovery(actionexec,timeout))
+        return 1 if len(self.hosts) else 2
     
     def get_timeout(self):
         return 5
-
-    def handler(self,hp,buf):
-        retval = 1 if len(self.hosts) else 2
-        for keyv, buffcont in buf.copy().items():
-            data = buffcont.data
-            if not self.is_discovery_response(data):
-                continue
-            if keyv not in self.hosts:
-                if data.find(DISCOVERY_ALLONE)>=0:
-                    typed = DeviceAllOne
-                elif data.find(DISCOVERY_S20)>=0:
-                    typed = DeviceS20
-                else:
-                    print("Unknown device type %s %s"% (keyv,data[31:37].encode('hex')))
-                    continue
-                dev = typed(hp = buffcont.addr, mac = data[7:13], sec1900 = struct.unpack('<I',data[37:41])[0])
-                print("Discovered device %s" % dev)
-                self.hosts[keyv] = dev
-                print("ln = "+str(len(self.hosts))+" h = "+str(keyv))
-                retval = 1
-        print self.hosts
-        return retval
-
-
-    def get_payload(self):
-        return MAGIC + DISCOVERY_LEN + DISCOVERY_ID
 
 class ActionPause(Action):
     def __str__(self, *args, **kwargs):
@@ -3688,13 +4108,7 @@ class ActionDevicedl(Action):
 class ActionNotifystate(Action):
     def __init__(self,device,state):
         super(ActionNotifystate, self).__init__(device)
-        if isinstance(self.device,DeviceS20):
-            self.device.state = state
-    def mqtt_publish_onfinish(self,rv):
-        if isinstance(self.device,DeviceS20):
-            return self.device.mqtt_power_state()#lista di dict con topic msg e options(retain, qos)
-        else:
-            return list()
+        self.device.process_asynch_state_change(state)
     def modifies_device(self):
         return False
     def runint(self, actionexec, returnvalue = RV_NOT_EXECUTED):
@@ -3709,6 +4123,7 @@ class ActionIrask(Action):
     def modifies_device(self):
         return False
     def runint(self, actionexec, returnvalue = RV_NOT_EXECUTED):
+        print("Please press "+self.irname)
         return 1
     def to_json(self):
         rv = Action.to_json(self)
@@ -3745,63 +4160,6 @@ class ActionStatechange(Action):
         rv = Action.to_json(self)
         rv.update({'newstate':self.newstate})
         return rv
-    
-    def do_presend_operations(self, actionexec):
-        if isinstance(self.device,IrManager):
-            actionexec.insert_action(ActionEmitir(self.device,self.newstate),0)
-            return 1
-        elif isinstance(self.device,DeviceVirtual):
-            if self.newstate in self.device.states_map:
-                i = 0
-                for act in self.device.states_map[self.newstate]:
-                    realdev = self.device.get_real_dev(act)
-                    for d in realdev:
-                        randid = 8950+i
-                        i+=1
-                        actcmd = "%d statechange %s %s" % (randid,d,act["s"])
-                        print("Scheduling "+actcmd)
-                        event.EventManager.fire(eventname = 'ExtInsertAction',\
-                                                cmdline = actcmd,action = None)
-                self.device.state = self.newstate
-                return 1
-            else:
-                return None
-        else:
-            return 1
-
-    def do_postsend_operations(self, actionexec):
-        if isinstance(self.device, DeviceS20):
-            actionexec.insert_action(ActionSubscribe(self.device),1)
-
-    def is_statechange_response(self,data):
-        return len(data)>6 and data[4:6] == (STATECHANGE_ID)
-
-    def handler(self,hp,data):
-        if isinstance(self.device,DevicePrimelan):
-            return data['rv']
-        elif isinstance(self.device,DeviceVirtual):
-            return data['rv']
-        elif isinstance(self.device,IrManager):
-            return 1
-        elif self.is_my_mac(data) and self.is_statechange_response(data):
-            if isinstance(self.device, DeviceS20):
-                #self.device.state = 0 if data[-1:]==b'\x00' else 1
-                #_LOGGER_ACTION.debug("Device state changed %s", self.device)
-                return 1
-            else:
-                return 2
-        else:
-            return None
-
-    def get_payload(self):
-        newst = self.device.state_value_conv(self.newstate)
-        if isinstance(self.device, IrManager):
-            return ''
-        elif isinstance(self.device,DeviceS20):
-            return MAGIC + STATECHANGE_LEN + STATECHANGE_ID + self.device.mac + PADDING_1\
-                + PADDING_2+(b'\x01' if newst!="0" else b'\x00')
-        else:
-            return newst
 
 class ActionStateoff(ActionStatechange):
     def __init__(self, device):
@@ -3875,28 +4233,14 @@ class ActionLearnir(Action):
         self.irc = []
         self.idx = 0
         self.asked = -1
-        self.serial = 0
         self.publish = []
+        self.irdata = []
 
     def to_json(self):
         rv = Action.to_json(self)
         rv.update({'irname':self.irname,'irc':self.irc})
         return rv
-
-    def is_learnir_response(self,data):
-        return (isinstance(self.device, DeviceAllOne) and len(data)>=6 and data[4:6] == (LEARNIR_ID)) or\
-            ((isinstance(self.device, DeviceCT10) or isinstance(self.device, DeviceRM)) and \
-             'cmd' in data and (data['cmd']==25 or data['cmd']==116))
-            #and 'clientSessionId' in data and self.device.clientSessionId==data['clientSessionId'])
-
-    def do_presend_operations(self, actionexec):
-        if isinstance(self.device,IrManager) and self.device.backupstate==0 and self.asked<self.idx:
-            self.asked+=1
-            actionexec.insert_action(ActionIrask(self.device,self.irname[self.asked]),0)
-            return 0
-        else:
-            return 1
-        
+            
     def runint(self, actionexec, returnvalue = RV_NOT_EXECUTED):
         if isinstance(self.device,IrManager):
             if self.device.backupstate==0:
@@ -3906,118 +4250,60 @@ class ActionLearnir(Action):
         else:
             return 11
 
-    def get_ir_from_data(self,data):
-        if isinstance(self.device, DeviceAllOne):
-            return {'irc':data[26:],'attrs':{}}
-        elif isinstance(self.device, DeviceCT10):
-            self.serial = data['serial']
-            attrs = dict()
-            if 'freq' in data:
-                attrs['freq'] = data['freq']
-            return {'irc':None if 'pluse' not in data else data['pluse'],\
-                    'attrs':attrs}
-        elif isinstance(self.device, DeviceRM):
-            if data['rv']!=0:
-                return {'irc':None,'attrs':data['rv']}
-            else:
-                time.sleep(self.device.inner.timeout)
-                data2 = self.device.inner.check_data()
-                if data2 is None or isinstance(data2, int):
-                    return {'irc':None,'attrs':data2}
-                else:
-                    if data2[0]=='\x26':
-                        freq = 38000
-                    elif data2[0]=='\xb2':
-                        freq = 433000000
-                    elif data2[0]=='\xd7':
-                        freq = 315000000
-                    else:
-                        freq = 0
-                    return {'irc':data2,'attrs':{'freq':freq}}
-        else:
-            return {'irc':None,'attrs':None}
-
-    def is_intermediate_response(self,data):
-        return (isinstance(self.device, DeviceAllOne) and data[2:4]==LEARNIR_LEN) or\
-            ((isinstance(self.device, DeviceCT10) or isinstance(self.device, DeviceRM)) and data['cmd']==25)
-
     def mqtt_publish_key(self,remnm,keynm,rv=1):
         self.publish.append(dict(remote=remnm,key=keynm,status=rv))
 
     def mqtt_publish_onfinish(self,rv):
         return [dict(topic=self.device.mqtt_topic("stat","learn"),msg=json.dumps(self.publish),options=dict())]
-
-    def handler(self,hp,data):
-        if self.is_my_mac(data) and self.is_learnir_response(data):
-            if isinstance(self.device, IrManager):
-                if self.is_intermediate_response(data):
-                    if isinstance(self.device, DeviceRM):
-                        return data['rv']
-                    else:
-                        return RV_DATA_WAIT
+    
+    def do_presend_operations(self, actionexec):
+        self.irdata = []
+        while self.idx<len(self.irname):
+            try:
+                ird = self.irname[self.idx]
+                tt = ird.split(':')
+                if len(tt)==2 and len(tt[0]) and len(tt[1]):
+                    self.irdata = ird
+                    return 1
                 else:
-                    tt = self.irname[self.idx].split(':')
-                    dname = tt[0]
-                    irname = tt[1]
-                    irdata = self.get_ir_from_data(data)
-                    irc = irdata['irc']
-                    if irc is None:
-                        self.mqtt_publish_key(dname,irname,irdata['attrs'])
-                        return irdata['attrs']
-                    else:
-                        self.irc.append(self.device.ir_encode(irc))
-                        if dname not in self.device.dir:
-                            self.device.dir[dname] = dict()
-                        irnamea = irname.split(',')
-                        first = True
-                        for x in irnamea:
-                            if len(x):
-                                if first:
-                                    first = False
-                                    save = irname
-                                    self.mqtt_publish_key(dname,x,1)
-                                else:
-                                    save = ''
-                                self.device.dir[dname].update({x:(irc,save,irdata['attrs'])})
-                        self.idx+=1
-                        time.sleep(1)
-                        if self.idx>=len(self.irname):
-                            return 1
-                        else:
-                            return 0
+                    self.idx+=1
+            except:
+                traceback.print_exc()
+                self.idx+=1
+        return Action.do_presend_operations(self, actionexec)
+
+    def exec_handler(self, rv, irdata, **kwargs):
+        if not self.irname:
+            return 3
+        else:
+            tt = self.irname[self.idx].split(':')
+            dname = tt[0]
+            irname = tt[1]
+            if rv!=1:
+                self.mqtt_publish_key(dname,irname,rv)
+                return rv
             else:
-                return 2
-        else:
-            return None
-
-    def create_message(self):
-        if isinstance(self.device, DeviceAllOne):
-            return MAGIC + LEARNIR_LEN + LEARNIR_ID + self.device.mac + PADDING_1\
-                + LEARNIR_2
-        elif isinstance(self.device, DeviceRM):
-            return 'a'
-        elif isinstance(self.device, DeviceCT10):
-            fk = self.irname[self.idx][self.irname[self.idx].find(':')+1:].translate(None, '!@#$/\+-_')
-            if len(fk)<2:
-                fk = SendBufferTimer.generatestring(5);
-            cmd = collections.OrderedDict()
-            cmd['fKey'] = fk
-            cmd['fid'] = self.device.get_fid()
-            cmd['uid'] = self.device.mac.encode('hex')
-            cmd['cmd'] = 25
-            cmd['order'] = 'ir control'
-            cmd['lastUpdateTime'] = int(Device.unix_time_millis(datetime.now())/1000.0)
-            cmd['clientSessionId'] = self.device.clientSessionId
-            cmd['serial'] = None
-            cmd['deviceId'] = self.device.deviceId
-            cmd['fName'] = fk
-            return cmd
-        else:
-            return ''
-
-    def get_payload(self):
-        print("Please press "+self.irname[self.idx])
-        return self.create_message()
+                irc = irdata['irc']
+                self.irc.append(self.device.ir_encode(irc))
+                if dname not in self.device.dir:
+                    self.device.dir[dname] = dict()
+                irnamea = irname.split(',')
+                first = True
+                for x in irnamea:
+                    if len(x):
+                        if first:
+                            first = False
+                            save = irname
+                            self.mqtt_publish_key(dname,x,1)
+                        else:
+                            save = ''
+                        self.device.dir[dname].update({x:(irc,save,irdata['attrs'])})
+                self.idx+=1
+                time.sleep(1)
+                if self.idx>=len(self.irname):
+                    return 1
+                else:
+                    return 0
 
 class ActionEditraw(Action):
     
@@ -4026,9 +4312,6 @@ class ActionEditraw(Action):
 
     def modifies_device(self):
         return True
-
-    def needs_subscription(self):
-        return False
 
     def __init__(self, device, irshname,*args):
         super(ActionEditraw,self).__init__(device)
@@ -4111,9 +4394,6 @@ class ActionCreatesh(Action):
     def modifies_device(self):
         return True
 
-    def needs_subscription(self):
-        return False
-
     def __init__(self, device, shname, *args):
         super(ActionCreatesh,self).__init__(device)
         self.irname = ActionEmitir.parse_args(device,*args)
@@ -4182,19 +4462,13 @@ class ActionEmitir(Action):
         self.irc = [];
         self.idx = 0
         self.publish = []
+        self.irdata = []
 
     def to_json(self):
         rv = Action.to_json(self)
         rv.update({'irname':self.irname,'irc':self.irc})
         return rv
-
-    def is_emitir_response(self,data):
-        return (isinstance(self.device, DeviceAllOne) and len(data)>=6 and data[4:6] == (EMITIR_ID)) or \
-            ('cmd' in data and data['cmd']==15 and \
-            ((isinstance(self.device, DeviceCT10) and \
-                    'clientSessionId' in data and self.device.clientSessionId==data['clientSessionId']) or \
-             isinstance(self.device, DeviceRM)) or isinstance(self.device, DeviceUpnpIR))
-            
+                
     def do_presend_operations(self, actionexec):
         while 1:
             if self.idx<len(self.irname):
@@ -4217,29 +4491,41 @@ class ActionEmitir(Action):
                 tmp = currentk.split(':')
                 event.EventManager.fire(eventname = 'ExtInsertAction',hp = (self.device.host,self.device.port),action = None,cmdline ="45 emitir %s %s:%s" % (tmp[0],tmp[1],tmp[2]),pos = 0)
                 return 0
-        return 1
-
-    def handler(self,hp,data):
-        if self.is_my_mac(data) and self.is_emitir_response(data):
-            if not isinstance(self.device, IrManager):
-                return 2
-            else:
-                if isinstance(self.device, DeviceRM) or isinstance(self.device, DeviceUpnpIR):
-                    if data['rv'] is None or data['rv']>0:
-                        return data['rv']
-                self.idx+=1
-                p = self.device.emit_ir_delay
-                if self.idx<len(self.irname) and self.irname[self.idx][0]=='$':
-                    p = float(self.irname[self.idx][1:])
-                    self.idx+=1
-                time.sleep(p)
-                if self.idx>=len(self.irname):
+        self.irdata = []
+        while self.idx<len(self.irname):
+            try:
+                tt = self.irname[self.idx].split(':')
+                nm = tt[1]
+                dev = tt[0]
+                self.irdata = self.device.get_dir(dev,nm)
+                if not self.irdata:
+                    self.irdata = self.convert_ir(dev,nm)
+                if len(self.irdata):
+                    self.irc.append(self.device.ir_encode(self.irdata[0]))
+                    self.mqtt_publish_key(dev,nm,1)
                     return 1
                 else:
-                    return 0
+                    self.mqtt_publish_key(dev,nm,2)
+                    self.idx+=1
+            except:
+                traceback.print_exc()
+                self.idx+=1
+        return 2
+
+    def exec_handler(self,rv,data):
+        if rv is None or rv!=1:
+            return rv
         else:
-            #print("PPP "+str(data)+self.device.mac.encode('hex'))
-            return None
+            self.idx+=1
+            p = self.device.emit_ir_delay
+            if self.idx<len(self.irname) and self.irname[self.idx][0]=='$':
+                p = float(self.irname[self.idx][1:])
+                self.idx+=1
+            time.sleep(p)
+            if self.idx>=len(self.irname):
+                return 1
+            else:
+                return 0
 
     def convert_ir(self,dev,nm):
         irc = ()
@@ -4315,63 +4601,6 @@ class ActionEmitir(Action):
             irc = self.device.get_dir(dev,self.irname[self.idx][len(dev)+1:])
         return irc
 
-    def create_message(self,irdata):
-        if isinstance(self.device, DeviceAllOne):
-            irc = irdata[0]
-            plen = struct.pack('>H',len(irc)+26)
-            ilen = struct.pack('<H',len(irc))
-            rnd = struct.pack('<H',randint(0,65535))
-            return MAGIC + plen + EMITIR_ID + self.device.mac + PADDING_1\
-                + EMITIR_2 + rnd + ilen + irc
-        elif isinstance(self.device, DeviceCT10):
-            cmd = collections.OrderedDict()
-            cmd['uid'] = self.device.mac.encode('hex')
-            cmd['defaultResponse'] = 1
-            cmd['delayTime'] = 0
-            cmd['qualityOfService'] = 1
-            cmd['clientSessionId'] = self.device.clientSessionId
-            cmd.update(irdata[2])
-            cmd['pluseNum'] = irdata[0].count(',')+1
-            cmd['value1'] = 0
-            cmd['value2'] = 0
-            cmd['value3'] = 0
-            cmd['value4'] = 0
-            cmd['cmd'] = 15
-            cmd['order'] = 'ir control'
-            #cmd['userName'] = 'fulminedipegasus@gmail.com'
-            cmd['pluseData'] = irdata[0]
-            cmd['serial'] = None
-            cmd['deviceId'] = self.device.deviceId
-            return cmd
-        elif isinstance(self.device, DeviceRM):
-            return irdata[0]
-        elif isinstance(self.device, DeviceUpnpIR):
-            return irdata
-        else:
-            return ''
-
-    def get_payload(self):
-        while self.idx<len(self.irname):
-            try:
-                tt = self.irname[self.idx].split(':')
-                nm = tt[1]
-                dev = tt[0]
-                irdata = []
-                irdata = self.device.get_dir(dev,nm)
-                if not irdata:
-                    irdata = self.convert_ir(dev,nm)
-                if len(irdata):
-                    self.irc.append(self.device.ir_encode(irdata[0]))
-                    self.mqtt_publish_key(dev,nm,1)
-                    return self.create_message(irdata)
-                else:
-                    self.mqtt_publish_key(dev,nm,2)
-                    self.idx+=1
-            except:
-                traceback.print_exc()
-                self.idx+=1
-        return ''
-
     def mqtt_publish_key(self,remnm,keynm,rv=1):
         self.publish.append(dict(remote=remnm,key=keynm,status=rv))
 
@@ -4380,14 +4609,7 @@ class ActionEmitir(Action):
 
 
 class ActionViewtable(Action):
-
-    @staticmethod
-    def get_ver_flag(device,table,defv):
-        if device.tablever is not None and str(table) in device.tablever:
-            return str(device.tablever[str(table)]['flgn'])
-        else:
-            return defv
-
+    
     def modifies_device(self):
         return self.m_device
 
@@ -4405,101 +4627,21 @@ class ActionViewtable(Action):
         rv.update({'tbl':str(self.tablenum)+":"+str(self.vflag)})
         return rv
 
-    def is_viewtable_response(self,data):
-        return len(data)>=28 and data[4:6] == (VIEW_TABLE_ID) and struct.unpack('<B',data[23])[0]==self.tablenum
-
-    def parse_table(self,data):
-        pass
-
-    def handler(self,hp,data):
-        if self.is_my_mac(data) and self.is_viewtable_response(data):
-            if self.device.rawtables is None:
-                self.device.rawtables = dict()
-            self.device.rawtables[str(self.tablenum)] = data
-            self.parse_table(data)
-            return 1
-        else:
-            return None
-
-    def get_payload(self):
-        return MAGIC + VIEW_TABLE_LEN + VIEW_TABLE_ID + self.device.mac + PADDING_1\
-            + PADDING_2+struct.pack('<B',self.tablenum)+b'\x00'+struct.pack('<B',self.vflag)+PADDING_2
 
 class ActionViewtable1(ActionViewtable):
 
     def __init__(self, device):
         super(ActionViewtable1,self).__init__(device,"1","0")
 
-    def parse_table(self,data):
-        start = 28
-        ln = len(data)
-        self.device.tablever = {}
-        while start+8<=ln:
-            '''print("allv = "+data[start+2:start+8].encode('hex'))'''
-            vern = struct.unpack('<H',data[start+2:start+4])[0]
-            tabn = struct.unpack('<H',data[start+4:start+6])[0]
-            flgn = struct.unpack('<H',data[start+6:start+8])[0]
-            tabns = str(tabn)
-            self.device.tablever[tabns] = {}
-            self.device.tablever[tabns]['vern'] = vern
-            self.device.tablever[tabns]['flgn'] = flgn
-            start+=8
-
 class ActionViewtable3(ActionViewtable):
 
     def __init__(self, device):
-        super(ActionViewtable3,self).__init__(device,"3",ActionViewtable.get_ver_flag(device,"3", "2"))
-
-    def parse_timer_record(self,rec):
-        tcode = struct.unpack('<H',rec[2:4])[0]
-        swAction = 0 if rec[20:21] == b'\x00' else 1
-        year = struct.unpack('<H',rec[22:24])[0]
-        month = struct.unpack('<B',rec[24:25])[0]
-        day = struct.unpack('<B',rec[25:26])[0]
-        h = struct.unpack('<B',rec[26:27])[0]
-        m = struct.unpack('<B',rec[27:28])[0]
-        s = struct.unpack('<B',rec[28:29])[0]
-        rep = struct.unpack('<B',rec[29:30])[0]
-        self.device.timers.append(dict(code = tcode,action = swAction,rep = rep, hour = h, minute = m, second = s, year = year,month = month, day = day))
-
-    def parse_table(self,data):
-        start = 28
-        ln = len(data)
-        self.device.timers = []
-        while start<ln:
-            lenrec = struct.unpack('<H',data[start:start+2])[0]
-            rec = data[start:start+2+lenrec]
-            self.parse_timer_record(rec)
-            start+=2+lenrec
-
-    def get_payload(self):
-        if isinstance(self.device,DeviceAllOne) or\
-            isinstance(self.device, DeviceCT10) or\
-            isinstance(self.device, DeviceRM) or\
-            isinstance(self.device, DeviceUpnpIR):
-            return '';
-        else:
-            return ActionViewtable.get_payload(self)
+        super(ActionViewtable3,self).__init__(device,"3",DeviceUDP.get_ver_flag(device,"3", "2"))
 
 class ActionViewtable4(ActionViewtable):
 
-    def is_viewtable_response(self,data):
-        return super(ActionViewtable4,self).is_viewtable_response(data) and len(data)>=168
-
     def __init__(self, device):
-        super(ActionViewtable4,self).__init__(device,"4",ActionViewtable.get_ver_flag(device,"4", "23"))
-
-    def parse_table(self,data):
-        if len(self.device.name)==0 or self.device.name==self.device.default_name():
-            strname = data[70:86].replace(b'\xff','').replace(b'\x00','').strip()
-            if len(strname):
-                self.device.name = strname
-        timerSetString = struct.unpack('<B',data[164:165])[0]
-        timerValString = struct.unpack('<H',data[166:168])[0]
-        self.device.timer_off_after_on = 0 if not timerSetString else timerValString
-        tzS = struct.unpack('<B',data[162:163])[0]
-        tz  = struct.unpack('<B',data[163:164])[0]
-        self.device.timezone = DeviceUDP.TIMEZONE_NOT_SET if tzS else tz
+        super(ActionViewtable4,self).__init__(device,"4",DeviceUDP.get_ver_flag(device,"4", "23"))
 
 class ActionSettable(Action):
 
@@ -4518,35 +4660,6 @@ class ActionSettable(Action):
         rv = Action.to_json(self)
         rv.update({'tbl':str(self.tablenum)+":"+str(self.actionid)})
         return rv
-
-    def get_record(self):
-        return ''
-
-    def process_received_response(self,hp,data):
-        pass
-
-    def handler(self,hp,data):
-        if self.is_my_mac(data) and self.is_settable_response(data):
-            self.process_received_response(hp,data)
-            return 1
-        else:
-            return None
-
-    def is_settable_response(self,data):
-        return len(data)>=6 and data[4:6] == (WRITE_TABLE_ID)
-
-    def get_payload(self):
-        record = self.get_record()
-        if len(record):
-            pay = WRITE_TABLE_ID + self.device.mac + PADDING_1\
-                    + PADDING_2 + struct.pack('<H',self.tablenum)+struct.pack('<B',self.actionid)
-
-            if self.actionid!=DELRECORD_CODE:
-                pay+=struct.pack('<H',len(record))
-            pay+=record
-            return MAGIC+struct.pack('>H',len(pay)+4)+pay
-        else:
-            return ''
 
 class ActionSettable3(ActionSettable):
     def __str__(self, *args, **kwargs):
@@ -4605,48 +4718,8 @@ class ActionSettable3(ActionSettable):
                 'action':self.action})
         return rv
 
-    def do_presend_operations(self, actionexec):
-        if isinstance(self.device, DeviceS20):
-            if self.device.timers is None:
-                act = ActionViewtable3(self.device)
-                act.m_device = False
-                actionexec.insert_action(act,0)
-                return 0
-        else:
-            self.device.manage_timer(datetime_o = self.datetime,rep = self.rep,action = self.action,timerid = self.timerid,actionid = self.actionid)
-        return 1
-
     def do_postsend_operations(self, actionexec):
         actionexec.insert_action(ActionViewtable3(self.device),1)
-
-    def get_record(self):
-        if isinstance(self.device, DeviceS20) or isinstance(self.device,DeviceAllOne):
-            if self.datetime is None:
-                return struct.pack('<H',self.timerid)
-            else:
-                if self.timerid is None or self.timerid<0:
-                    timerid = 1
-                    while True:
-                        repeat = False
-                        for t in self.device.timers:
-                            if t['code']==timerid:
-                                timerid+=1
-                                repeat = True
-                                break
-                        if not repeat:
-                            break
-                else:
-                    timerid = self.timerid
-
-                record = struct.pack('<H',timerid) + PADDING_1 + PADDING_1\
-                    + '\x20\x20\x20\x20' + struct.pack('<H',self.action) + struct.pack('<H',self.datetime.year)\
-                    + struct.pack('<B',self.datetime.month) + struct.pack('<B',self.datetime.day)\
-                    + struct.pack('<B',self.datetime.hour) + struct.pack('<B',self.datetime.minute)\
-                    + struct.pack('<B',self.datetime.second) + struct.pack('<B',self.rep)
-
-                return record
-        else:
-            return ''
 
 class ActionDeltimer(ActionSettable3):
     def __init__(self, device, timerid):
@@ -4679,34 +4752,22 @@ class ActionCleartimers(Action):
             self.idx+=1
             return 0
         else:
-            return 1
+            return Action.do_presend_operations(self, actionexec)
 
 class ActionGetstate(Action):
     def __init__(self, device,*args, **kwargs):
         super(ActionGetstate,self).__init__(device)
         self.outstate = {}
-
-    def needs_subscription(self):
-        return False
-    
+  
     def to_json(self):
         rv = Action.to_json(self)
         rv.update({'outstate':self.outstate})
         return rv
     
-    def handler(self,hp,data):
-        if self.is_my_mac(data):
-            self.outstate = data['outstate']
-            return None if data['rv'] is None else data['rv']+1
-        else:
-            return None
+    def exec_handler(self,rv,data):
+        self.outstate = data
+        return rv
 
-    def get_payload(self):
-        if isinstance(self.device,DeviceUpnpIR):
-            return 'a'
-        else:
-            return ''
-                
 class ActionGetinfo(Action):
     def __init__(self, *args, **kwargs):
         super(ActionGetinfo,self).__init__(None)
@@ -4719,9 +4780,6 @@ class ActionGetinfo(Action):
         rv.update({'discovery':self.disc.hosts})
         return rv
 
-    def needs_subscription(self):
-        return False
-
     def do_presend_operations(self, actionexec):
         if self.state==0:
             actionexec.insert_action(self.disc,0)
@@ -4731,8 +4789,7 @@ class ActionGetinfo(Action):
             if self.devs is None:
                 self.devs = self.disc.hosts.items()
             for x in range(len(self.devs)):
-                if isinstance(self.devs[x][1], DeviceUDP):
-                    actionexec.insert_action(ActionViewtable1(self.devs[x][1]),x)
+                actionexec.insert_action(ActionViewtable1(self.devs[x][1]),x)
             self.state+=1
             return 0
         elif self.state==2:
@@ -4820,45 +4877,6 @@ class ActionSettable4(ActionSettable):
 
     def do_postsend_operations(self, actionexec):
         actionexec.insert_action(ActionViewtable4(self.device),1)
-
-    def ip2string(self,ip):
-        ipp = ip.split('.')
-        if len(ipp)==4:
-            ipr = ''
-            for i in ipp:
-                try:
-                    ipr+=struct.pack('<B',int(i))
-                except:
-                    traceback.print_exc()
-                    ipr+=b'\x01'
-            return ipr
-        else:
-            return b'\x0A\x00\x00\x01'
-
-    def get_record(self):
-        if self.device.rawtables is None or "4" not in self.device.rawtables:
-            return ''
-        else:
-            pay = self.device.rawtables["4"]
-            lenrec = struct.unpack('<H',pay[28:30])[0]
-            record = pay[30:30+lenrec]
-
-
-            if self.name is None:
-                nm = None
-            elif len(self.name)>16:
-                nm = self.name[0:16]
-            else:
-                nm = self.name.ljust(16)
-            if nm is not None:
-                record = record[0:40]+nm+record[56:]
-            if self.ip is not None:
-                record = record[0:118]+self.ip2string(self.ip)+self.ip2string(self.gateway)+self.ip2string(self.nmask)+b'\x00\x01'+record[132:]
-            if self.timezone is not None:
-                record = record[0:132]+(b'\x01\x00' if self.timezone==DeviceUDP.TIMEZONE_NOT_SET else b'\x00'+struct.pack('<b',self.timezone))+record[134:]
-            if self.timer_off_after_on is not None:
-                record = record[0:134]+(b'\x00\xff' if self.timer_off_after_on<=0 else b'\x01\x00')+struct.pack('<H',self.timer_off_after_on)+record[138:]
-            return record
 
     #===========================================================================
     # def get_payload(self):

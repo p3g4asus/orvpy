@@ -4067,6 +4067,11 @@
           <ir>sam:HDMI1</ir>
           <ir>blackbeam1:sky:sky</ir>
         </sh>
+        <sh name="tvsamsungterraon">
+          <ir>blackbeam1:samsung:1</ir>
+          <ir>$10</ir>
+          <ir>sam:1</ir>
+        </sh>
       </shs>
       <timers/>
     </device>
