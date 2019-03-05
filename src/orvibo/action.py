@@ -3605,7 +3605,7 @@ class DeviceRM(IrManager,ManTimerManager):
                 #Forzo futura riconnessione
                 print("Blackbeam %s error: will try to reconnect" % self.name)
                 self.inner = None
-                if rv!=0:
+                if rv is not None:
                     rv+=600
             else:
                 rv+=1
