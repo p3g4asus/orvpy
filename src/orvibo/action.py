@@ -35,7 +35,39 @@ import SimpleHTTPServer
 import upnpclient
 import samsungctl
 from orvibo.samsung_mappings import samsung_mappings
+import sys
 
+
+def s2b(data)
+    if sys.version_info < (3, 0):
+        return bytes(data)
+    elif type(data)==bytes:
+        return data
+    else:
+        return bytes(data, 'utf8')
+
+def b2s(data)
+    if sys.version_info < (3, 0):
+        return str(data)
+    elif type(data)==str:
+        return data
+    else
+        return data.decode('utf8')
+
+def uunq(url)
+    if sys.version_info < (3, 0):
+        return urllib.unquote(url).decode("utf-8")
+    else
+        return urllib.parse.unquote_to_bytes(url)
+
+def tohexbytes(data)
+    if sys.version_info < (3, 0) or type(data)==bytes:
+        return binascii.hexlify(data)
+    elif type(data)==str:
+        return binascii.hexlify(s2b(data))
+
+def bytesfromhex(data)
+    return binascii.unhexlify(data)
 
 def _default(self, obj):
     try:
@@ -239,13 +271,13 @@ class SendBufferTimer(object):
     def handle_incoming_data(data, key = PK_KEY):
         try:
             valasci = binascii.crc32(data[42:])
-            print("K=%s Computed CRC %08X vs %s" % (key,valasci,data[6:10].encode('hex')))
+            print("K=%s Computed CRC %08X vs %s" % (b2s(key),valasci,b2s(tohexbytes(data[6:10]))))
             if valasci==struct.unpack('>i',data[6:10])[0]:
-                cry = AES.new(key, AES.MODE_ECB)
+                cry = AES.new(s2b(key), AES.MODE_ECB)
                 msg = cry.decrypt(data[42:])
-                print("Decrypted MSG %s" % msg)
-                jsono = json.loads(msg[0:msg.rfind('}')+1])
-                return {'msg':jsono,'convid':data[10:42]}
+                print("Decrypted MSG %s" % b2s(msg))
+                jsono = json.loads(msg[0:msg.rfind(b'}')+1])
+                return {'msg':jsono,'convid':b2s(data[10:42])}
         except:
             traceback.print_exc()
             pass
@@ -253,7 +285,7 @@ class SendBufferTimer(object):
 
     def handle_incoming_data2(self,data):
         try:
-            if data[4:6]=="pk":
+            if data[4:6]==b"pk":
                 key = PK_KEY
             else:
                 key = self.clientinfo['key']
@@ -308,17 +340,17 @@ class SendBufferTimer(object):
         if len(self.jsono):
             if 'key' in self.clientinfo:
                 key = self.clientinfo['key']
-                typemsg = 'dk'
+                typemsg = b'dk'
             else:
                 key = PK_KEY
-                typemsg = 'pk'
+                typemsg = b'pk'
             if 'convid' in self.clientinfo:
                 convid = self.clientinfo['convid']
             else:
-                convid = chr(0)*32
+                convid = (b"\x00")*32
             return SendBufferTimer.get_send_bytes(self.jsono, convid, key, typemsg)
         else:
-            return ''
+            return b''
 
     @staticmethod
     def get_send_bytes(jsono, convid, key = PK_KEY, typemsg = "dk"):
@@ -329,13 +361,13 @@ class SendBufferTimer(object):
                 jsono['serial'] = SendBufferTimer.get_serial()
             if 'key' in jsono and jsono['key'] is None:
                 jsono['key'] = SendBufferTimer.generatestring(16)
-            msg = json.dumps(jsono)
-            print("Encrypting with %s MSG %s" % (key,msg))
+            msg = s2b(json.dumps(jsono))
+            print("Encrypting with %s MSG %s" % (b2s(key),b2s(msg)))
             lnmsg = len(msg)
             remain = lnmsg%16
             if remain>0:
                 remain = (lnmsg//16)*16+16-lnmsg
-                msg+=(chr(0x20)*remain)
+                msg+=b"\x20"*remain
             ln = lnmsg+remain+4+2+2+2+32
             cry = AES.new(key, AES.MODE_ECB)
             newbytes = cry.encrypt(msg)
@@ -344,7 +376,7 @@ class SendBufferTimer(object):
             return bytesa+newbytes
         except:
             traceback.print_exc()
-            return '';
+            return b'';
 
 class TCPClient(EthSender):
     def __init__(self,timeo):
@@ -376,17 +408,17 @@ class HTTPServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         self.resp_val = {}
         event.EventManager.on('ActionParsed', self.schedule_response)
         SimpleHTTPServer.SimpleHTTPRequestHandler.__init__(self,request, client_address, server)
-        
+
     def setup(self):
         SimpleHTTPServer.SimpleHTTPRequestHandler.setup(self)
         self.request.settimeout(60)
-        
+
     def log(self,msg):
-        print "[%s] (%s:%d) -> %s" % (self.__class__.__name__,\
+        print ("[%s] (%s:%d) -> %s" % (self.__class__.__name__,\
                                       self.client_address[0],\
                                       self.client_address[1],\
-                                      msg)
-    
+                                      msg))
+
     def schedule_response(self,randid,action,**kwargs):
         self.log("action parsed")
         if action is not None:
@@ -397,7 +429,7 @@ class HTTPServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             self.resp_val = {'action':None,'retval':None}
             self.resp_status = HTTPServerHandler.RESP_OK
             self.log("schedule_response resp OK")
-            
+
     def write_response_base(self,obj):
         self.protocol_version = 'HTTP/1.1'
         if 'action' in obj and obj['action'] is not None:
@@ -406,19 +438,19 @@ class HTTPServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             self.send_response(403, 'Forbidden')
         self.send_header('Content-type', 'application/json')
         self.end_headers()
-        self.wfile.write(bytes(json.dumps(obj)))
-    
+        self.wfile.write(s2b(json.dumps(obj)))
+
     def write_response(self,device,action,retval):
         self.resp_val = {'action':action,'retval':retval}
         self.resp_status = HTTPServerHandler.RESP_OK
         self.log("write_response resp OK")
-    
+
     def do_GET(self):
-        self.log(urllib.unquote(self.path[1:]).decode('utf8'))
+        self.log(b2s(uuq(self.path[1:])))
         self.resp_status = HTTPServerHandler.RESP_WAIT
         event.EventManager.fire(eventname = 'ExtInsertAction',\
-                        cmdline = str(self.client_address[1])+" "+\
-                            urllib.unquote(self.path[1:]).decode('utf8'),action = None)
+                        cmdline = s2b(str(self.client_address[1]))+b" "+\
+                            uuq(self.path[1:]),action = None)
         while self.resp_status == HTTPServerHandler.RESP_WAIT and not self.server.s.stopped:
             time.sleep(0.2)
         self.log("write response NOW")
@@ -429,7 +461,7 @@ class HTTPServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         #return SimpleHTTPServer.SimpleHTTPRequestHandler.do_GET(self)
 
 class HTTPServer(threading.Thread):
-    
+
     def __init__(self,tcpport):
         super(HTTPServer,self).__init__()
         self.port = tcpport
@@ -437,7 +469,7 @@ class HTTPServer(threading.Thread):
         self.stopped = True
         self.actions = {}
         self.cond = threading.Condition()
-        
+
     def stop(self):
         if self.server is not None:
             self.cond.acquire()
@@ -450,13 +482,13 @@ class HTTPServer(threading.Thread):
             self.server = None
         else:
             self.stopped = True
-            
+
     def schedule_action(self,randid,client):
         if not self.stopped:
             self.cond.acquire()
             self.actions[str(randid)] = client
             self.cond.release()
-            
+
     def run(self):
         event.EventManager.on('ActionDone', self.handle_action_done)
         self.stopped = False
@@ -470,12 +502,12 @@ class HTTPServer(threading.Thread):
         if self.server is not None:
             self.server.s = self
             self.server.serve_forever()
-            
+
     def handle_action_done(self,device,action,retval,**kwargs):
         if not self.stopped:
             s = str(action.randomid)
             client = None
-            print "Searching http client"
+            print("Searching http client")
             self.cond.acquire()
             if s in self.actions:
                 client = self.actions[s]
@@ -600,7 +632,7 @@ class TCPServer(threading.Thread):
                     snd = self.towrite[keyv].pop(0)
                     #print("01_1")
                 elif snd.timer is not None: #dobbiamo aspettare la risposta
-                    snd= ''
+                    snd= b''
                     #print("01_2")
                     break
                 elif snd.has_succeeded() or snd.has_failed():
@@ -609,7 +641,7 @@ class TCPServer(threading.Thread):
                     if snd.has_failed():
                         self.clientinfo[keyv]['disconnecttimer'] = time.time()
                     self.towrite[keyv].pop(0)
-                    snd = ''
+                    snd = b''
                     #print("01_3")
                 else: #dobbiamo ancora spedire il pacchetto o c'e gia stato un timeout ma dobbiamo fare altri tentativi
                     snd.clientinfo = self.clientinfo[keyv]
@@ -630,7 +662,7 @@ class TCPServer(threading.Thread):
 
     def get_connected_clients(self):
         lst = dict()
-        for _, v in self.clientinfo.iteritems():
+        for _, v in self.clientinfo.items():
             if 'device' in v:
                 keyv = '{}:{}'.format(*(v['hp']))
                 lst[keyv] = v['device']
@@ -642,14 +674,14 @@ class TCPServer(threading.Thread):
             self.cond.acquire()
 
             if not isinstance(w, SendBufferTimer):
-                for keyv, v in self.clientinfo.iteritems():
-                    if v['type']=='mfz':
+                for keyv, v in self.clientinfo.items():
+                    if v['type']==b'mfz':
                         self.innerschedule(keyv, w)
                         exitv = True
             else:
                 keyv = '{}:{}'.format(*(w.addr))
                 if not keyv in self.clientinfo:
-                    for keyv, v in self.clientinfo.iteritems():
+                    for keyv, v in self.clientinfo.items():
                         if 'mac' in v and v['mac']==w.mac:
                             self.innerschedule(keyv, w)
                             exitv = True
@@ -680,24 +712,24 @@ class RoughParser(object):
 
         hp = returnv['addr']
 
-        if len(data)>6 and data[0]=='@':
-            returnv['type'] = 'mfz'
-            idx = data.find('\n')
+        if len(data)>6 and data[0]==b'@':
+            returnv['type'] = b'mfz'
+            idx = data.find(b'\n')
             if idx<0:
                 if len(data)>=200:
                     returnv['idxout'] = RoughParser.DISCARD_BUFFER
                 else:
                     returnv['idxout'] = RoughParser.STILL_WAIT
             else:
-                print("R ["+hp[0]+":"+str(hp[1])+"] <-"+data)
+                print("R ["+hp[0]+":"+str(hp[1])+"] <-"+b2s(data))
                 event.EventManager.fire(eventname = 'ExtInsertAction',hp = hp,cmdline = data[1:],action = None)
                 returnv['idxout'] = idx+1
         elif len(data)>7 and data[0:2]== MAGIC:
             msgid = data[4:6]
             ln = struct.unpack('>H',data[2:4])[0]
-            print("Detected Magic with ln %d and id %s" %(ln,msgid))
+            print("Detected Magic with ln %d and id %s" %(ln,b2s(msgid)))
             if len(data)>=ln:
-                returnv['type'] = 'cry' if msgid==PK_MSG_ID or msgid==DK_MSG_ID else 'orv'
+                returnv['type'] = b'cry' if msgid==PK_MSG_ID or msgid==DK_MSG_ID else b'orv'
                 returnv['idxout'] = ln
                 contentmsg = data[0:ln]
                 if msgid==PK_MSG_ID:
@@ -709,7 +741,7 @@ class RoughParser(object):
                             #obj['serial']
                             dictout = {'serial':0,'cmd':0,'key':None,'status':0}
                             returnv['name'] = name.replace(' ','_')
-                            returnv['reply'] = SendBufferTimer.get_send_bytes(dictout, None,typemsg="pk")
+                            returnv['reply'] = SendBufferTimer.get_send_bytes(dictout, None, typemsg=b"pk")
                             returnv['key'] = dictout['key']
                 elif msgid==DK_MSG_ID:
                     if 'sender' in clinfo:
@@ -723,29 +755,29 @@ class RoughParser(object):
                             returnv['localIp'] = obj['localIp']
                             returnv['localPort'] = obj['localPort']
                             returnv['password'] = obj['password']
-                            returnv['mac'] = obj['uid'].decode('hex')
+                            returnv['mac'] = b2s(tohexbytes(obj['uid']))
                             returnv['convid'] = outv['convid']
                             dictout = {'serial':obj['serial'],'cmd':6,'status':0}
-                            returnv['reply'] = SendBufferTimer.get_send_bytes(dictout, outv['convid'],key = returnv['key'],typemsg="dk")
+                            returnv['reply'] = SendBufferTimer.get_send_bytes(dictout, outv['convid'],key = returnv['key'],typemsg=b"dk")
                             dev = DeviceCT10(hp = hp,\
                                             mac = returnv['mac'],\
                                             name = returnv['name']+'_'+obj['uid'],\
                                             key = returnv['key'],\
                                             password = obj['password'],\
-                                            deviceid = SendBufferTimer.generatestring(32),\
-                                            clientsessionid=SendBufferTimer.generatestring(32),\
-                                            hp2=(obj['localIp'],obj['localPort']))
+                                            deviceid = b2s(SendBufferTimer.generatestring(32)),\
+                                            clientsessionid = b2s(SendBufferTimer.generatestring(32)),\
+                                            hp2 = (obj['localIp'],obj['localPort']))
                             returnv['device'] = dev
                             act = ActionDiscovery()
                             act.hosts[obj['uid']] = dev
                             event.EventManager.fire(eventname = 'ActionDiscovery',device = dev,action = act,retval = 1)
                         elif obj['cmd']==116 or obj['cmd']==32:
                             dictout = {'serial':obj['serial'],'cmd':obj['cmd'],'status':0,'uid':obj['uid']}
-                            returnv['reply'] = SendBufferTimer.get_send_bytes(dictout, outv['convid'],key = returnv['key'],typemsg="dk")
+                            returnv['reply'] = SendBufferTimer.get_send_bytes(dictout, outv['convid'],key = returnv['key'],typemsg=b"dk")
                             returnv['disconnecttimer'] = time.time()+3*60
                 else:
                     if msgid==STATECHANGE_EXT_ID or msgid==DISCOVERY_ID:
-                        event.EventManager.fire(eventname = 'ExtChangeState',hp = hp,mac = DeviceUDP.mac_from_data(data),newstate = "1" if data[-1:]==b'\x01' else "0")
+                        event.EventManager.fire(eventname = 'ExtChangeState',hp = hp,mac = DeviceUDP.mac_from_data(data),newstate = b"1" if data[-1:]==b'\x01' else b"0")
                     returnv['idxout'] = RoughParser.UNRECOGNIZED
             else:
                 returnv['idxout'] = RoughParser.STILL_WAIT
@@ -830,7 +862,7 @@ class ActionExecutor(threading.Thread):
         if self.httpserver is not None:
             print("Stopping TCP Server")
             self.httpserver.stop()
-            self.httpserver = None            
+            self.httpserver = None
         if self.udpmanager is not None:
             print("Stopping UDPManager")
             self.udpmanager.stop()
@@ -932,7 +964,7 @@ class ListenerTh(threading.Thread,EthSender):
                 try:
                     #print('enterrecv')
                     data, addr = self.socket.recvfrom(1024)
-                    if data is not None and len(data) and self.preparse.parse(addr,data if data[0]!='@' else data+'\n')['idxout']==RoughParser.UNRECOGNIZED:
+                    if data is not None and len(data) and self.preparse.parse(addr,data if data[0]!=b'@' else data+b'\n')['idxout']==RoughParser.UNRECOGNIZED:
                         event.EventManager.fire(eventname = 'RawDataReceived',hp = addr,data = data)
                     #print('exitrecv')
                 except:
@@ -956,7 +988,7 @@ class UdpManager(object):
         self.buffer_l = None
 
     def add_to_buffer(self,hp,data,**kwargs):
-        rx = re.compile(MAGIC+'(.{2}).{2}.*'+MAC_START)
+        rx = re.compile(MAGIC+b'(.{2}).{2}.*'+MAC_START)
         self.buffer_l.acquire()
         #print("unsplit R <-"+data.encode('hex'))
         control = {}
@@ -974,7 +1006,7 @@ class UdpManager(object):
                     if keyv not in control:
                         control[keyv] = 1
                         self.buffer[keyv] = EthBuffCont(hp,sect)
-                        print("R ["+keyv+"] <-"+sect.encode('hex'))
+                        print("R ["+keyv+"] <-"+tohexbytes(sect))
                 else:
                     break
             else:
@@ -1017,7 +1049,7 @@ class UdpManager(object):
             if len(payload)>0 and retval!=RV_DATA_WAIT:
                 try:
                     self.sender.send_packet(hp2,payload)
-                    print("S [{}:{}] -> {}".format(hp2[0],hp2[1],payload.encode('hex')))
+                    print("S [{}:{}] -> {}".format(hp2[0],hp2[1],b2s(tohexbytes(payload))))
                 except:
                     traceback.print_exc()
                     return None
@@ -1069,7 +1101,7 @@ class UdpManager(object):
     @staticmethod
     def keyfind(addr,data):
         mac = DeviceUDP.mac_from_data(data)
-        return mac.encode('hex') if mac else "{}:{}".format(*addr)
+        return b2s(tohexbytes(mac)) if mac else "{}:{}".format(*addr)
 
     def configure(self):
         if self.buffer_l is None:
@@ -1104,13 +1136,13 @@ def class_forname( kls ):
 class Device(object):
     epoch = datetime.utcfromtimestamp(0)
     dictionary = dict()
-    
+
     def process_asynch_state_change(self,state):
         pass
-    
+
     def connect_devices(self,device_map):
         pass
-    
+
     def state_value_conv(self,s):
         return s
 
@@ -1158,7 +1190,7 @@ class Device(object):
         client.subscribe(lsttopic)
 
     def mqtt_on_message(self, client, userdata, msg):
-        print(self.name+" MSG "+msg.topic+" ("+str(msg.qos)+")-> "+str(msg.payload))
+        print(self.name+" MSG "+msg.topic+" ("+str(msg.qos)+")-> "+b2s(msg.payload))
 
 
     def mqtt_publish_all(self,lsttopic):
@@ -1182,7 +1214,7 @@ class Device(object):
     def dictionary_write(el):
         words = SubElement(el, "dictionary")
 
-        for w,lst in Device.dictionary.iteritems():
+        for w,lst in Device.dictionary.items():
             word = SubElement(words, "word",{"name":w})
             for s in lst:
                 v = SubElement(word,'v')
@@ -1249,7 +1281,7 @@ class Device(object):
 
     def send_action(self,actionexec,action,pay):
         return None
-    
+
     def get_action_payload(self,action):
         return ''
 
@@ -1299,7 +1331,7 @@ class Device(object):
         return reparsed.toprettyxml(indent="  ")
 
     def default_name(self):
-        return 'dev_'+self.mac.encode('hex')
+        return 'dev_'+b2s(tohexbytes(self.mac))
 
     def __init__(self,hp = ('',0),mac = '',root = None,name = '', **kw):
         if root is None:
@@ -1311,7 +1343,7 @@ class Device(object):
         else:
             self.host = root.attributes['host'].value
             self.port = int(root.attributes['port'].value)
-            self.mac = root.attributes['mac'].value.decode('hex')
+            self.mac = bytesfromhex(root.attributes['mac'].value)
             self.name = root.attributes['name'].value
             try:
                 self.offlimit = int(root.attributes['offlimit'].value)
@@ -1337,7 +1369,7 @@ class Device(object):
                 "host":str(self.host),
                 "port":str(self.port),
                 "offlimit":str(self.offlimit),
-                "mac":self.mac.encode('hex'),
+                "mac":b2s(tohexbytes(self.mac)),
                 "type":self.__class__.__name__,
                 "mytime":str(Device.unix_time_millis(datetime.now())),
                 "name":self.name
@@ -1361,7 +1393,7 @@ class DeviceUDP(Device):
     TIMEZONE_NOT_SET = 9000
     TIMEZONE_NONE = 70000
     OFF_AFTER_ON_NONE = 70000
-    
+
     @staticmethod
     def mac_from_data(data):
         idx = data.find(MAC_START)
@@ -1369,11 +1401,11 @@ class DeviceUDP(Device):
             return data[idx:idx+6]
         else:
             return None
-        
+
     def is_my_mac(self,data):
         mac = DeviceUDP.mac_from_data(data)
         return False if not mac else mac==self.mac
-    
+
     def do_presend_operations(self, action, actionexec):
         if isinstance(action, (ActionStatechange,ActionLearnir,ActionEmitir,ActionViewtable,ActionSettable)):
             if self.needs_resubscription():
@@ -1381,8 +1413,8 @@ class DeviceUDP(Device):
                 return 0
             self.subs_action()
         return Device.do_presend_operations(self, action, actionexec)
-    
-    
+
+
     @staticmethod
     def discovery_handler(hp,action,buf,**kwargs):
         hosts = dict()
@@ -1396,14 +1428,14 @@ class DeviceUDP(Device):
                 elif data.find(DISCOVERY_S20)>=0:
                     typed = DeviceS20
                 else:
-                    print("Unknown device type %s %s"% (keyv,data[31:37].encode('hex')))
+                    print("Unknown device type %s %s"% (keyv,b2s(tohexbytes(data[31:37]))))
                     continue
                 dev = typed(hp = buffcont.addr, mac = data[7:13], sec1900 = struct.unpack('<I',data[37:41])[0])
                 print("Discovered device %s" % dev)
                 hosts[keyv] = dev
                 print("ln = "+str(len(hosts))+" h = "+str(keyv))
         return hosts
-    
+
     @staticmethod
     def discovery(actionexec,timeout = 5,**kwargs):
         return actionexec.udpmanager._udp_transact(\
@@ -1416,27 +1448,27 @@ class DeviceUDP(Device):
 
     def prepare_additional_file(self,root,flag):
         self.xml_table_element(root,flag)
-        
+
     @staticmethod
     def is_subscribe_response(data):
         return len(data)>=13 and data[4:6] == (SUBSCRIBE_ID)
-    
+
     @staticmethod
     def is_statechange_response(data):
         return len(data)>6 and data[4:6] == (STATECHANGE_ID)
-    
+
     @staticmethod
     def is_viewtable_response(data):
         return len(data)>=28 and data[4:6] == (VIEW_TABLE_ID)
-    
+
     @staticmethod
     def is_viewtable4_response(data):
         return len(data)>=168 and data[4:6] == (VIEW_TABLE_ID)
-    
+
     @staticmethod
     def is_settable_response(data):
         return len(data)>=6 and data[4:6] == (WRITE_TABLE_ID)
-    
+
     @staticmethod
     def get_ver_flag(device,table,defv):
         stable = str(table)
@@ -1445,7 +1477,7 @@ class DeviceUDP(Device):
             return str(device.tablever[stable]['flgn'])
         else:
             return defv
-    
+
     @staticmethod
     def ip2string(ip):
         ipp = ip.split('.')
@@ -1461,7 +1493,7 @@ class DeviceUDP(Device):
         else:
             return b'\x0A\x00\x00\x01'
 
-    
+
     def parse_table1(self,data):
         start = 28
         ln = len(data)
@@ -1476,7 +1508,7 @@ class DeviceUDP(Device):
             self.tablever[tabns]['vern'] = vern
             self.tablever[tabns]['flgn'] = flgn
             start+=8
-            
+
     def parse_timer_record(self,rec):
         tcode = struct.unpack('<H',rec[2:4])[0]
         swAction = 0 if rec[20:21] == b'\x00' else 1
@@ -1498,7 +1530,7 @@ class DeviceUDP(Device):
             rec = data[start:start+2+lenrec]
             self.parse_timer_record(rec)
             start+=2+lenrec
-            
+
     def parse_table4(self,data):
         if len(self.name)==0 or self.name==self.default_name():
             strname = data[70:86].replace(b'\xff','').replace(b'\x00','').strip()
@@ -1510,7 +1542,7 @@ class DeviceUDP(Device):
         tzS = struct.unpack('<B',data[162:163])[0]
         tz  = struct.unpack('<B',data[163:164])[0]
         self.timezone = DeviceUDP.TIMEZONE_NOT_SET if tzS else tz
-    
+
     def process_response(self,hp,action,data,**kwargs):
         out = dict(rv=None,data=None)
         if isinstance(action, ActionSubscribe) and DeviceUDP.is_subscribe_response(data) and self.is_my_mac(data):
@@ -1537,14 +1569,14 @@ class DeviceUDP(Device):
         elif isinstance(action, ActionStatechange) and DeviceUDP.is_statechange_response(data) and self.is_my_mac(data):
             out['rv'] = 1
         return out
-    
+
     def receive_handler(self,hp,action,data,**kwargs):
         out = self.process_response(hp, action, data)
         return action.exec_handler(**out)
 
     def send_action(self,actionexec,action,pay):
         return actionexec.udpmanager._udp_transact(action = action,hp = (self.host,self.port),payload = pay,handler = self.receive_handler,timeout = action.get_timeout())
-    
+
     def get_table3_record(self,action):
         if action.datetime is None:
             return struct.pack('<H',action.timerid)
@@ -1570,7 +1602,7 @@ class DeviceUDP(Device):
                 + struct.pack('<B',action.datetime.second) + struct.pack('<B',action.rep)
 
             return record
-    
+
     def get_table4_record(self,action):
         if self.rawtables is None or "4" not in self.rawtables:
             return ''
@@ -1597,7 +1629,7 @@ class DeviceUDP(Device):
             return record
 
 #concetto di handler dopo send_action rimane ma  ha come parametri rv (valore di ritorno e data che dipende dall'azione')
-#l'handler esegue quello che deve con il data controllando rv. ritorna il valore che deve in vase ad rv (valore ok 0)'    
+#l'handler esegue quello che deve con il data controllando rv. ritorna il valore che deve in vase ad rv (valore ok 0)'
     def get_action_payload(self, action):
         if isinstance(action, ActionSubscribe):
             return MAGIC + SUBSCRIBE_LEN + SUBSCRIBE_ID + self.mac \
@@ -1617,7 +1649,7 @@ class DeviceUDP(Device):
             if len(record):
                 pay = WRITE_TABLE_ID + self.mac + PADDING_1\
                         + PADDING_2 + struct.pack('<H',action.tablenum)+struct.pack('<B',action.actionid)
-    
+
                 if action.actionid!=DELRECORD_CODE:
                     pay+=struct.pack('<H',len(record))
                 pay+=record
@@ -1749,19 +1781,19 @@ class DeviceS20(DeviceUDP):
         #    self.state = -1
         #else:
         #    self.state = int(root.attributes['state'].value)
-        
+
     def process_asynch_state_change(self,state):
         self.state = state
-        
+
     def mqtt_publish_onfinish(self, action, retval):
         if isinstance(action, (ActionSubscribe,ActionNotifystate)):
             return self.mqtt_power_state()
         else:
             return DeviceUDP.mqtt_publish_onfinish(self, action, retval)
-        
+
     def state_value_conv(self,s):
         return "1" if s!="0" else "0"
-    
+
     def do_presend_operations(self, action, actionexec):
         if isinstance(action, ActionSettable3):
             if self.timers is None:
@@ -1770,7 +1802,7 @@ class DeviceS20(DeviceUDP):
                 actionexec.insert_action(act,0)
                 return 0
         return DeviceUDP.do_presend_operations(self, action, actionexec)
-    
+
     def do_postsend_operations(self, action, actionexec):
         if isinstance(action, ActionStatechange):
             actionexec.insert_action(ActionSubscribe(self),1)
@@ -1836,7 +1868,7 @@ class ManTimerManager(object):
 
     def to_json(self):
         return {}
-    
+
     def do_presend_operations(self, action, actionexec):
         if isinstance(action, ActionSettable3):
             self.manage_timer(datetime_o = action.datetime,rep = action.rep,action = action.action,timerid = action.timerid,actionid = action.actionid)
@@ -2029,17 +2061,17 @@ class IrManager(Device):
             self.ir_xml_device_node_parse(root,self.d433,"d433")
             self.ir_xml_device_node_parse(root,self.dir,"dir")
             self.sh_xml_device_node_parse(root,self.sh,"sh")
-    
+
     def schedule_action(self,topic,convert,*args):
         event.EventManager.fire(eventname = 'ExtInsertAction',hp = (self.host,self.port),cmdline ="",  \
                             action = ActionBackup(self,topic,convert))
-    
+
     def send_action(self, actionexec, action, pay):
         if isinstance(action, ActionStatechange):
             return action.exec_handler(1,None)
         else:
             return Device.send_action(self, actionexec, action, pay)
-        
+
     def do_presend_operations(self, action, actionexec):
         if isinstance(action,ActionStatechange):
             actionexec.insert_action(ActionEmitir(self,action.newstate),0)
@@ -2053,25 +2085,25 @@ class IrManager(Device):
                 return 1
         else:
             return Device.do_presend_operations(self, action, actionexec)
-    
+
     def on_stop(self):
         Device.on_stop(self)
         if self.backuptimer:
             self.backuptimer.cancel()
             self.backuptimer = None
-    
+
     def get_dir(self,rem,key):
         if rem in self.dir and key in self.dir[rem]:
             return self.dir[rem][key]
         else:
             return []
-            
+
     def get_arduraw(self,remote,irdata):
         return {}
-    
+
     def get_from_arduraw(self,a):
         return ()
-    
+
     def nextbackup(self,topic,convert):
         lst2 = sorted(self.dir)
         idx = 0;
@@ -2113,7 +2145,7 @@ class IrManager(Device):
         self.backupstate = 0
         self.backuptimer = None
         return []
-        
+
     def to_dict(self):
         dct = Device.to_dict(self)
         #a = datetime(1900,1,1,0,0,0)
@@ -2122,7 +2154,7 @@ class IrManager(Device):
         dct.update({\
                 "emit_delay":str(self.emit_ir_delay)
             });
-        return dct        
+        return dct
 
 
     def to_json(self):
@@ -2133,7 +2165,7 @@ class IrManager(Device):
                 'dir':self.readable_ir(self.dir)
             })
         return rv
-        
+
     def set_emit_delay(self,d):
         if d>=0.3:
             self.emit_ir_delay = d
@@ -2327,14 +2359,14 @@ class IrManager(Device):
                     else:
                         topic = out
                         convert = False
-                        
+
                     event.EventManager.fire(eventname = 'ExtInsertAction',hp = (self.host,self.port),cmdline ="",  \
                             action = ActionBackup(self,topic,convert))
             elif sub=="learn" or sub=="emit":
                 print("topic "+msg.topic+" ["+msg.payload+"]")
                 learnk = json.loads(msg.payload)
                 keyall = []
-                for d in learnk:                       
+                for d in learnk:
                     ksing = ('' if d['key'][0]=='@' or d['key'][0]=='$' else (d["remote"]+':'))+d["key"];
                     #print("KSING "+ksing+" "+str(type(ksing)))
                     if 'a' in d and 'remote' in d and len(d['remote']):
@@ -2356,7 +2388,7 @@ class IrManager(Device):
                         action = action)
         except:
             traceback.print_exc()
-            
+
 class DeviceVirtual(Device):
     def target_xml_device_node_parse(self,root,lst):
         d433s = root.getElementsByTagName('target')
@@ -2366,20 +2398,20 @@ class DeviceVirtual(Device):
             except:
                 traceback.print_exc()
                 pass
-                       
+
     def get_last_target_from_state(self):
         d2 = []
         if self.state in self.states_map:
             for t in self.states_map[self.state]:
                 d2.append(t["d"])
         return d2
-    
+
     def get_action_payload(self, action):
         if isinstance(action, ActionStatechange):
             return self.state_value_conv(action.newstate)
         else:
             return Device.get_action_payload(self, action)
-        
+
     def do_presend_operations(self, action, actionexec):
         if isinstance(action,ActionStatechange):
             if action.newstate in action.states_map:
@@ -2398,7 +2430,7 @@ class DeviceVirtual(Device):
             else:
                 return None
         return Device.do_presend_operations(self, action, actionexec)
-            
+
     def get_real_dev(self,el):
         d = el['d']
         d2 = [el['d']]
@@ -2412,8 +2444,8 @@ class DeviceVirtual(Device):
                 d2 = self.get_last_target_from_state()
         print("D is "+d+" Real Dev is "+str(d2))
         return d2
-            
-            
+
+
     def states_xml_device_node_parse(self,root,lst,nicks):
         d433s = root.getElementsByTagName('state')
         for d433 in d433s:
@@ -2438,37 +2470,37 @@ class DeviceVirtual(Device):
             except:
                 traceback.print_exc()
                 pass
-            
+
     def states_xml_device_node_write(self,el,lst,nicks):
         states = SubElement(el, "states")
-        for stname,acts in lst.iteritems():
+        for stname,acts in lst.items():
             stel = SubElement(states, "state",{"value":stname,"nick":nicks[stname]})
             for a in acts:
                 actel = SubElement(stel, "action", {"device":a["d"]})
                 actel.text = a["s"]
-                
+
     def target_xml_device_node_write(self,el,lst):
         targets = SubElement(el, "targets")
         for t in lst:
             stel = SubElement(targets, "target")
             stel.text = t
-                
+
     def xml_element(self,root,flag = 0):
         el = Device.xml_element(self, root, flag)
-        self.target_xml_device_node_write(el,self.target)        
+        self.target_xml_device_node_write(el,self.target)
         self.states_xml_device_node_write(el,self.states_map,self.states_nick_map)
         return el
-            
+
     def __init__(self,hp = ('',0),mac = '',root = None,name = ''):
         Device.__init__(self,hp,mac,root,name)
         self.state = ''
         self.states_map = {}
         self.states_nick_map = {}
-        self.target = []        
+        self.target = []
         if root is not None:
             self.states_xml_device_node_parse(root,self.states_map,self.states_nick_map)
             self.target_xml_device_node_parse(root,self.target)
-            
+
     def to_json(self):
         rv = Device.to_json(self)
         rv.update({\
@@ -2476,16 +2508,16 @@ class DeviceVirtual(Device):
                    'nicks':self.states_nick_map,
                    'state':self.state})
         return rv
-    
+
     def send_action(self, actionexec, action, state):
         if isinstance(action,ActionStatechange):
             return action.exec_handler(1,None)
         else:
             return Device.send_action(self, actionexec, action, state)
-        
+
 
 class DeviceUpnp(Device):
-    
+
     @staticmethod
     def correct_upnp_name(name):
         return name.replace('/',' ').\
@@ -2496,7 +2528,7 @@ class DeviceUpnp(Device):
             replace(']',' ').\
             replace('(',' ').\
             replace(')',' ')
-       
+
     def __init__(self,hp = ('',0),mac = '',root = None,name = '',location='',deviceobj = None):
         Device.__init__(self,hp,mac,root,name)
         self.upnp_obj = deviceobj
@@ -2505,7 +2537,7 @@ class DeviceUpnp(Device):
             self.upnp_location = location
         else:
             self.upnp_location = root.attributes['upnp_location'].value
-            
+
     def init_device(self):
         if self.upnp_obj is None:
             try:
@@ -2514,17 +2546,17 @@ class DeviceUpnp(Device):
                 traceback.print_exc()
                 self.upnp_obj = None
         return self.upnp_obj
-        
-            
+
+
     def to_dict(self):
         rv = Device.to_dict(self)
         rv.update({'upnp_location':self.upnp_location})
         return rv
-    
+
     def copy_extra_from(self, already_saved_device):
         Device.copy_extra_from(self, already_saved_device)
         self.upnp_location = already_saved_device.upnp_location
-    
+
     @staticmethod
     def get_name(d):
         if len(d.friendly_name):
@@ -2536,7 +2568,7 @@ class DeviceUpnp(Device):
         else:
             rv = d.location
         return DeviceUpnp.correct_upnp_name(rv)
-        
+
     @staticmethod
     def discovery(timeout=5):
         out = {}
@@ -2546,8 +2578,8 @@ class DeviceUpnp(Device):
             print("Found "+str(len(devs))+" upnp devices")
             rc = {"RenderingControl":DeviceUpnpIRRC,"MainTVAgent2":DeviceUpnpIRTA2}
             for d in devs:
-                u = urlparse.urlparse(d.location)                   
-                for k,v in rc.iteritems():
+                u = urlparse.urlparse(d.location)
+                for k,v in rc.items():
                     if k in d.service_map:
                         print("Found "+k+" at "+d.location)
                         hp = (u.hostname,u.port)
@@ -2560,7 +2592,7 @@ class DeviceUpnp(Device):
         except:
             traceback.print_exc()
         return out
-            
+
 class ContextException(Exception):
     """An Exception class with context attached to it, so a caller can catch a
     (subclass of) ContextException, add some context with the exception's
@@ -2600,7 +2632,7 @@ class Channel(object):
             self._parse_xml(from_dat)
         else:
             self._parse_dat(from_dat)
-            
+
     def _parse_xml(self,root):
         try:
             self.ch_type = root.getElementsByTagName('ChType')[0].childNodes[0].nodeValue
@@ -2674,20 +2706,20 @@ class Channel(object):
         return ('<?xml version="1.0" encoding="UTF-8" ?><Channel><ChType>%s</ChType><MajorCh>%d'
                 '</MajorCh><MinorCh>%d</MinorCh><PTC>%d</PTC><ProgNum>%d</ProgNum></Channel>') % \
             (escape(self.ch_type), self.major_ch, self.minor_ch, self.ptc, self.prog_num)
-            
+
     def as_params(self,chtype,sid):
         return {'ChannelListType':chtype,'Channel':self.as_xml,'SatelliteID':sid}
-            
+
 class Source(object):
     def __init__(self,root):
         name = root.getElementsByTagName('SourceType')
         sid = root.getElementsByTagName('ID')
         self.sname = name[0].childNodes[0].nodeValue
         self.sid = int(sid[0].childNodes[0].nodeValue)
-    
+
     def as_params(self):
         return {'Source':self.sname,'ID':self.sid,'UiID':self.sid}
-    
+
 class DeviceSamsungCtl(IrManager,ManTimerManager):
     CTL_KEY = "ctl"
     def __init__(self,hp = ('',0),mac = '',root = None,name = '',conf = ''):
@@ -2704,18 +2736,18 @@ class DeviceSamsungCtl(IrManager,ManTimerManager):
         self.config = None
         self.offt = -1
         self.init_device()
-        
+
     def ir_decode(self,irc):
         return irc
-    
+
     def get_action_payload(self, action):
         if isinstance(action, ActionEmitir):
             return action.irdata
         else:
             return IrManager.get_action_payload(self, action)
-    
+
     def fill_ir_list(self):
-        dc = {k:(v,k,{'type':DeviceSamsungCtl.CTL_KEY}) for k,v in samsung_mappings.iteritems()}
+        dc = {k:(v,k,{'type':DeviceSamsungCtl.CTL_KEY}) for k,v in samsung_mappings.items()}
         k = dc.keys()
         for s in k:
             if s in Device.dictionary:
@@ -2724,7 +2756,7 @@ class DeviceSamsungCtl(IrManager,ManTimerManager):
                     if len(x):
                         dc.update({x:(s,'',dc[s][2])})
         self.dir[self.name] = dc
-        
+
     def destroy_device(self):
         if self.remote is not None:
             try:
@@ -2732,7 +2764,7 @@ class DeviceSamsungCtl(IrManager,ManTimerManager):
             except:
                 pass
             self.remote = None
-    
+
     def init_device(self):
         now = time.time()
 
@@ -2750,17 +2782,17 @@ class DeviceSamsungCtl(IrManager,ManTimerManager):
             except:
                 traceback.print_exc()
                 self.destroy_device()
-                
+
         return self.remote
 
     def ir_encode(self,irc):
         return irc
-    
+
     def to_dict(self):
         rv = Device.to_dict(self)
         rv.update({'conffile':self.conffile})
         return rv
-        
+
     def copy_extra_from(self,already_saved_device):
         Device.copy_extra_from(self,already_saved_device)
         IrManager.copy_extra_from(self,already_saved_device)
@@ -2773,14 +2805,14 @@ class DeviceSamsungCtl(IrManager,ManTimerManager):
 
     def on_stop(self):
         IrManager.on_stop(self)
-        ManTimerManager.on_stop(self)    
-    
+        ManTimerManager.on_stop(self)
+
     def to_json(self):
         rv = Device.to_json(self)
         rv.update(IrManager.to_json(self))
         rv.update(ManTimerManager.to_json(self))
         return rv
-    
+
     def send_action(self,actionexec,action,pay):
         if isinstance(action, ActionEmitir):
             try:
@@ -2797,7 +2829,7 @@ class DeviceSamsungCtl(IrManager,ManTimerManager):
             return action.exec_handler(rv,None)
         else:
             return IrManager.send_action(self, actionexec, action, pay)
-    
+
 class DeviceUpnpIR(DeviceUpnp,IrManager,ManTimerManager):
     NUMBER_KEY = "1"
     SOURCE_KEY = "0"
@@ -2814,13 +2846,13 @@ class DeviceUpnpIR(DeviceUpnp,IrManager,ManTimerManager):
             self.ir_load = False
             self.remote_name = self.name
         self.offt = -1
-        
+
     def ir_decode(self,irc):
         return irc
 
     def ir_encode(self,irc):
         return irc
-    
+
     def get_action_payload(self, action):
         if isinstance(action, ActionGetstate):
             return 'a'
@@ -2828,13 +2860,13 @@ class DeviceUpnpIR(DeviceUpnp,IrManager,ManTimerManager):
             return action.irdata
         else:
             return DeviceUpnp.get_action_payload(self, action)
-        
+
     def copy_extra_from(self,already_saved_device):
         DeviceUpnp.copy_extra_from(self,already_saved_device)
         IrManager.copy_extra_from(self,already_saved_device)
         ManTimerManager.copy_extra_from(self,already_saved_device)
         self.remote_name = already_saved_device.remote_name
-        
+
     def xml_element(self,root,flag = 0):
         el = IrManager.xml_element(self, root, flag)
         ManTimerManager.xml_element(self, el, flag)
@@ -2842,14 +2874,14 @@ class DeviceUpnpIR(DeviceUpnp,IrManager,ManTimerManager):
 
     def on_stop(self):
         IrManager.on_stop(self)
-        ManTimerManager.on_stop(self)    
-    
+        ManTimerManager.on_stop(self)
+
     def to_json(self):
         rv = DeviceUpnp.to_json(self)
         rv.update(IrManager.to_json(self))
         rv.update(ManTimerManager.to_json(self))
-        return rv        
-    
+        return rv
+
 class DeviceUpnpIRTA2(DeviceUpnpIR):
     def __init__(self,hp = ('',0),mac = '',root = None,name = '',location='',deviceobj = None):
         DeviceUpnpIR.__init__(self,hp,mac,root,name,location,deviceobj)
@@ -2868,11 +2900,11 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
             self.upnp_rc_dev_name = root.attributes['upnp_rc_dev_name'].value
             self.samsungctl_dev_name = root.attributes['samsungctl_dev_name'].value
             self.tv_source = root.attributes['tv_source'].value
-            
+
         #print("LOC "+self.upnp_drc_location)
         if deviceobj is not None:
             self.init_device()
-            
+
     def connect_devices(self, device_map):
         DeviceUpnpIR.connect_devices(self, device_map)
         fill = False
@@ -2886,7 +2918,7 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                 fill = True
         if fill:
             self.fill_ir_list()
-            
+
     def get_current_source(self):
         now = time.time()
         if not len(self.current_source) or now-self.current_source_t>=10:
@@ -2902,13 +2934,13 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                 rv = ''
             self.current_source = rv
         return self.current_source
-    
+
     def copy_extra_from(self,already_saved_device):
         DeviceUpnpIR.copy_extra_from(self,already_saved_device)
         self.samsungctl_dev_name = already_saved_device.samsungctl_dev_name
         self.upnp_rc_dev_name = already_saved_device.upnp_rc_dev_name
         self.tv_source = already_saved_device.tv_source
-    
+
     def get_dir(self,rem,key):
         if self.init_device():
             if rem in self.dir:
@@ -2932,17 +2964,17 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                     if rv:
                         return rv
         return []
-        
+
     def to_dict(self):
         rv = DeviceUpnpIR.to_dict(self)
         rv.update({'upnp_rc_dev_name':self.upnp_rc_dev_name})
         rv.update({'samsungctl_dev_name':self.samsungctl_dev_name})
         rv.update({'tv_source':self.tv_source})
         return rv
-    
+
     def destroy_device(self):
         self.upnp_obj = None
-    
+
     def init_device(self):
         if self.upnp_obj is None or self.a is None or len(self.dir)==0 or len(self.sources)==0:
             rv = DeviceUpnpIR.init_device(self)
@@ -2959,12 +2991,12 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                 except:
                     traceback.print_exc();
                     self.destroy_device()
-                
+
         return self.upnp_obj
-    
+
     def fill_ir_list(self):
         if not self.ir_load:
-            dc = dict() 
+            dc = dict()
             for i in xrange(10):
                 dc[str(i)] = (str(i),str(i),{"type":DeviceUpnpIR.NUMBER_KEY})
             for s in self.sources.keys():
@@ -2977,10 +3009,10 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                         if len(x):
                             dc.update({x:(s,'',dc[s][2])})
             if self.samsungctl_dev:
-                _,v = next(iter(self.samsungctl_dev.dir.iteritems()))
+                _,v = next(iter(self.samsungctl_dev.dir.items()))
                 dc.update(v)
             if self.upnp_rc_dev:
-                _,v = next(iter(self.upnp_rc_dev.dir.iteritems()))
+                _,v = next(iter(self.upnp_rc_dev.dir.items()))
                 for k in v.keys():
                     mo = re.search("^([^\\+]+)(\\+?)", k)
                     if mo is not None:
@@ -2990,9 +3022,9 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                             except:
                                 pass
                 dc.update(v)
-            
+
             self.dir[self.remote_name] = dc
-        
+
     def get_channels_list(self):
         if not len(self.channels):
             try:
@@ -3005,10 +3037,10 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
             except:
                 traceback.print_exc()
                 self.channels = {}
-                
+
     def send_action(self,actionexec,action,pay):
         rv = None
-        outstate = None        
+        outstate = None
         if isinstance(action, ActionEmitir):
             try:
                 tp = pay[2]["type"]
@@ -3064,7 +3096,7 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                     outstate['source'] = vv
                 else:
                     rv|=4
-                    
+
                 if self.upnp_rc_dev:
                     rv2 = self.upnp_rc_dev.get_states()
                     outstate.update(self.upnp_rc_dev.states)
@@ -3076,7 +3108,7 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
             self.destroy_device()
         return action.exec_handler(rv,outstate) if isinstance(action, (ActionEmitir,ActionGetstate))\
             else DeviceUpnpIR.send_action(self, actionexec, action, pay)
-                
+
     def get_sources_list(self):
         if not len(self.sources):
             try:
@@ -3092,26 +3124,26 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
             except:
                 traceback.print_exc()
                 self.sources = None
-        
+
     @staticmethod
     def _parse_channel_list(channel_list):
         """Splits the binary channel list into channel entry fields and returns a list of Channels."""
-    
+
         # The channel list is binary file with a 4-byte header, containing 2 unknown bytes and
         # 2 bytes for the channel count, which must be len(list)-4/124, as each following channel
         # is 124 bytes each. See Channel._parse_dat for how each entry is constructed.
-    
+
         if len(channel_list) < 128:
             raise ParseException(('channel list is smaller than it has to be for at least '\
                                   'one channel (%d bytes (actual) vs. 128 bytes' % len(channel_list)),
                                  ('Channel list: %s' % repr(channel_list)))
-    
-    
+
+
         if (len(channel_list)-4) % 124 != 0:
             raise ParseException(('channel list\'s size (%d) minus 128 (header) is not a multiple of '\
                                   '124 bytes' % len(channel_list)),
                                  ('Channel list: %s' % repr(channel_list)))
-    
+
         actual_channel_list_len = (len(channel_list)-4) / 124
         expected_channel_list_len = _getint(channel_list, 2)
         if actual_channel_list_len != expected_channel_list_len:
@@ -3119,7 +3151,7 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                                   'channel list length (%d) as defined in header' % (len(channel_list),
                                   actual_channel_list_len, expected_channel_list_len))
                                  ('Channel list: %s' % repr(channel_list)))
-    
+
         channels = {}
         pos = 4
         while pos < len(channel_list):
@@ -3130,9 +3162,9 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
             except ParseException as pe:
                 pe.add_context('chunk starting at %d: %s' % (pos, repr(chunk)))
                 raise pe
-    
+
             pos += 124
-    
+
         print('Parsed %d channels'%len(channels))
         return channels
 
@@ -3144,10 +3176,10 @@ class DeviceUpnpIRRC(DeviceUpnpIR):
         self.states = dict.fromkeys(self.params)
         if deviceobj is not None:
             self.init_device()
-        
+
     def states_xml_device_node_write(self,el):
         targets = SubElement(el, "states")
-        for k,v in self.states.iteritems():
+        for k,v in self.states.items():
             if v is not None:
                 stel = SubElement(targets, "state",{'value':str(v)})
                 stel.text = k
@@ -3156,11 +3188,11 @@ class DeviceUpnpIRRC(DeviceUpnpIR):
         el = DeviceUpnpIR.xml_element(self, root, flag)
         self.states_xml_device_node_write(el)
         return el
-    
+
     def fill_ir_list(self):
         if not self.ir_load:
             dc = dict()
-            for s,v in self.states.iteritems():
+            for s,v in self.states.items():
                 if v is not None:
                     s = s.lower()
                     if s=="mute":
@@ -3170,7 +3202,7 @@ class DeviceUpnpIRRC(DeviceUpnpIR):
                         for x in xrange(0,104,5):
                             m = s+str(x)+"+"
                             dc[m] = (m,m,{"type":DeviceUpnpIR.RC_KEY})
-                            
+
             k = dc.keys()
             for s in k:
                 if s in Device.dictionary:
@@ -3179,7 +3211,7 @@ class DeviceUpnpIRRC(DeviceUpnpIR):
                         if len(x):
                             dc.update({x:(s,'',dc[s][2])})
             self.dir[self.remote_name] = dc
-    
+
     def get_dir(self,rem,key):
         if self.init_device():
             #print("KKK "+key+" "+rem+str(self.dir))
@@ -3225,10 +3257,10 @@ class DeviceUpnpIRRC(DeviceUpnpIR):
             dt+=1
         return action.exec_handler(dt,cmd) if isinstance(action, (ActionGetstate,ActionEmitir))\
             else DeviceUpnpIR.send_action(self, actionexec, action, pay)
-    
+
     def destroy_device(self):
         self.upnp_obj = None
-    
+
     def init_device(self):
         if self.upnp_obj is None or self.a is None:
             rv = DeviceUpnpIR.init_device(self)
@@ -3243,9 +3275,9 @@ class DeviceUpnpIRRC(DeviceUpnpIR):
                     self.destroy_device()
         if self.upnp_obj and self.a and len(self.dir)==0 and self.state_init:
             self.fill_ir_list()
-                
+
         return self.upnp_obj
-    
+
     def set_state(self,k,val):
         if self.init_device():
             try:
@@ -3265,8 +3297,8 @@ class DeviceUpnpIRRC(DeviceUpnpIR):
                 self.destroy_device()
                 traceback.print_exc()
         return None
-            
-    
+
+
     def get_states(self,what = None):
         rv = 0
         if self.init_device():
@@ -3299,7 +3331,7 @@ class DevicePrimelan(Device):
     #0: doppio pulsante
     #2: On off slider
     #1: slider 0-100
-    
+
     def state_value_conv(self,s):
         try:
             realv = int(s)
@@ -3327,13 +3359,13 @@ class DevicePrimelan(Device):
                 return "1"
         else:
             return s
-    
+
     def get_action_payload(self, action):
         if isinstance(action, ActionStatechange):
             return self.state_value_conv(action.newstate)
         else:
             return Device.get_action_payload(self, action)
-    
+
     crc16_table = [\
         0x0000,0xc0c1,0xc181,0x0140,0xc301,0x03c0,0x0280,0xc241,\
         0xc601,0x06c0,0x0780,0xc741,0x0500,0xc5c1,0xc481,0x0440,\
@@ -3368,11 +3400,11 @@ class DevicePrimelan(Device):
         0x4400,0x84c1,0x8581,0x4540,0x8701,0x47c0,0x4680,0x8641,\
         0x8201,0x42c0,0x4380,0x8341,0x4100,0x81c1,0x8081,0x4040\
     ]
-    
+
     @staticmethod
     def crc16(ba):
         return reduce(lambda x,y: ((x >> 8) & 0xff) ^ DevicePrimelan.crc16_table[(x ^ y) & 0xff],ba,0)
-    
+
     @staticmethod
     def discovery(hp,passw,codu,port2,timeout=10):
         try:
@@ -3403,13 +3435,13 @@ class DevicePrimelan(Device):
         except:
             traceback.print_exc()
             return {}
-    
+
     @staticmethod
     def generate_name_nick(nick):
         nick = nick.encode('ascii','ignore').strip().lower()
         name = nick.replace(' ','_')
         return (name,nick)
-    
+
     @staticmethod
     def generate_mac(ip,idv):
         lst = ip.split('.')
@@ -3418,7 +3450,7 @@ class DevicePrimelan(Device):
         lst.append(id2&0xFF)
         o = map(lambda x : chr(int(x)), lst)
         return ''.join(o)
-    
+
     def pkt_state(self,newstate):
         pre = '\x50\x53\x00\x00\x1a\x00\x00\x00\x2a\x00\x00\x00\x50\x50'
         out = '\x01\x00\x1a\x00\x00\x00'
@@ -3432,17 +3464,17 @@ class DevicePrimelan(Device):
         aesc2 = cipher.encrypt(aesc)
         crc = DevicePrimelan.crc16(bytearray(out+aesc2))
         return pre+chr(crc&0xFF)+chr((crc>>8)&0xFF)+out+aesc2
-    
+
     def change_state_http(self,pay,timeout):
         r = requests.post('http://{}:{}/cgi-bin/web.cgi'.format(self.host,self.port), \
               data={'tk': self.tk, 'qindex': self.qindex, 'mod': 'do_cmd','par':self.id,'act':pay},timeout = timeout)
         return 1 if r.status_code==200 else r.status_code
-    
+
     def change_state_tcp(self,state,timeout):
         t = TCPClient(timeout)
         return 1 if t.send_packet((self.host,self.port2), self.pkt_state(state))>0 else None
-        
-    
+
+
     def __init__(self,hp = ('',0),mac = '',root = None,name = '',idv=0,typev=0,tk='',qindex=0,passw = '',port2 = 6004,state=0):
         nn = DevicePrimelan.generate_name_nick(name)
         nick = nn[1]
@@ -3467,10 +3499,10 @@ class DevicePrimelan(Device):
             self.nick = nick
             self.passw = passw
             self.port2 = port2
-        
+
         self.key = self.passw+('\x00'*(16-len(self.passw)))
-        self.iv = reduce(lambda x,y: x+chr(ord(y[1])^y[0]),enumerate(self.key),'') 
-    
+        self.iv = reduce(lambda x,y: x+chr(ord(y[1])^y[0]),enumerate(self.key),'')
+
     def to_dict(self):
         rv = Device.to_dict(self)
         rv.update({\
@@ -3482,13 +3514,13 @@ class DevicePrimelan(Device):
                    'port2':str(self.port2),\
                    'nick':self.nick})
         return rv
-        
+
     def to_json(self):
         rv = Device.to_json(self)
         rv.update({'state':self.state,\
                    'oldstate':self.oldstate})
         return rv
-    
+
     def send_action(self, actionexec, action, pay):
         if isinstance(action,ActionStatechange):
             timeout = action.get_timeout()
@@ -3496,7 +3528,7 @@ class DevicePrimelan(Device):
                 timeout = actionexec.udpmanager.timeout
             if timeout<0:
                 timeout = None
-            try:           
+            try:
                 state = int(pay)
                 rv = self.change_state_tcp(state,timeout)
                 if rv==1:
@@ -3510,9 +3542,9 @@ class DevicePrimelan(Device):
             return action.exec_handler(rv,self.state)
         else:
             return Device.send_action(self, actionexec, action, pay)
-            
+
 class DeviceRM(IrManager,ManTimerManager):
-    
+
     def inner_init(self):
         try:
             self.inner = broadlink.rm((self.host,self.port),bytearray(self.mac))
@@ -3521,7 +3553,7 @@ class DeviceRM(IrManager,ManTimerManager):
         except:
             traceback.print_exc()
             self.inner = None
-            
+
     def get_action_payload(self, action):
         if isinstance(action, ActionLearnir):
             return action.irdata
@@ -3529,7 +3561,7 @@ class DeviceRM(IrManager,ManTimerManager):
             return action.irdata
         else:
             return IrManager.get_action_payload(self, action)
-          
+
     @staticmethod
     def discovery(actionexec,timeout,**kwargs):
         hosts = dict()
@@ -3542,17 +3574,17 @@ class DeviceRM(IrManager,ManTimerManager):
                                             mac = str(d.mac),\
                                             root = None,name = '',inner = d)
         return hosts
-    
+
     def __init__(self,hp = ('',0),mac = '',root = None,name = '',inner = None):
         Device.__init__(self,hp,mac,root,name)
         ManTimerManager.__init__(self, root)
         IrManager.__init__(self,hp,mac,root,name)
         self.offt = -1
         self.inner = inner
-        
+
     def get_arduraw(self,remote,irdata):
         return {'key':irdata[1],'remote':remote,'a':lircbroadlink.broadlink2lirc(irdata[0])};
-    
+
     def get_from_arduraw(self,msg):
         return (lircbroadlink.lirc2broadlink(msg['a']),msg['key'],{})
 
@@ -3655,11 +3687,11 @@ class DeviceRM(IrManager,ManTimerManager):
         return irc
 
 class DeviceCT10(IrManager,ManTimerManager):
-    
+
     @staticmethod
     def is_learnir_intermediate_response(data):
         return data["cmd"]==25
-    
+
     def receive_handler(self,hp,action,data,**kwargs):
         if isinstance(action, ActionLearnir):
             if DeviceCT10.is_learnir_intermediate_response(data):
@@ -3742,22 +3774,22 @@ class DeviceCT10(IrManager,ManTimerManager):
                 cmd['deviceId'] = self.deviceId
                 return cmd
         return IrManager.get_action_payload(self, action)
-    
+
     def get_fid(self):
         self.fid+=1
         return self.fid
-    
+
     @staticmethod
     def discovery(actionexec,timeout,**kwargs):
         return actionexec.tcpserver.get_connected_clients()
-    
+
     def get_arduraw(self,remote,irdata):
         out = []
         irenc = irdata[0].split(',')
         for h in irenc:
             out.append(int(h))
         return {'key':irdata[1],'remote':remote,'a':out};
-    
+
     def get_from_arduraw(self,msg):
         out = ''
         for h in msg['a']:
@@ -3874,19 +3906,19 @@ class DeviceAllOne(DeviceUDP,ManTimerManager,IrManager):
         rv.update(IrManager.to_json(self))
         rv.update(ManTimerManager.to_json(self))
         return rv
-    
+
     @staticmethod
     def is_learnir_response(data):
         return len(data)>=6 and data[4:6] == (LEARNIR_ID)
-    
+
     @staticmethod
     def is_learnir_intermediate_response(data):
         return data[2:4]==LEARNIR_LEN
-    
+
     @staticmethod
     def is_emitir_response(data):
         return len(data)>=6 and data[4:6] == (EMITIR_ID)
-    
+
     def get_action_payload(self, action):
         if isinstance(action, ActionLearnir):
             if len(action.irdata):
@@ -3902,7 +3934,7 @@ class DeviceAllOne(DeviceUDP,ManTimerManager,IrManager):
                     + EMITIR_2 + rnd + ilen + irc
         else:
             return DeviceUDP.get_action_payload(self, action)
-    
+
     def process_response(self, hp, action, data, **kwargs):
         if isinstance(action, ActionLearnir) and self.is_my_mac(data) and DeviceAllOne.is_learnir_response(data):
             if DeviceAllOne.is_learnir_intermediate_response(data):
@@ -3927,11 +3959,11 @@ class DeviceAllOne(DeviceUDP,ManTimerManager,IrManager):
     def on_stop(self):
         IrManager.on_stop(self)
         ManTimerManager.on_stop(self)
-        
+
     def get_arduraw(self,remote,irdata):
         irenc = list(struct.unpack_from('<'+('H'*((len(irdata[0])-16)/2)),irdata[0],16))
         return {'key':irdata[1],'remote':remote,'a':irenc};
-    
+
     def get_from_arduraw(self,msg):
         tpl = (0,0,len(msg['a'])*2+16,0,0,0,0,len(msg['a'])*2)
         out = struct.pack('<'+('H'*len(tpl)) ,*tpl)
@@ -4055,7 +4087,7 @@ class ActionDiscovery(Action):
 
     def modifies_device(self):
         return self.m_device
-    
+
     def runint(self, actionexec, returnvalue=RV_NOT_EXECUTED):
         timeout = self.get_timeout()
         if timeout is None or timeout<0:
@@ -4073,7 +4105,7 @@ class ActionDiscovery(Action):
         self.hosts.update(DeviceUpnp.discovery())
         self.hosts.update(DeviceUDP.discovery(actionexec,timeout))
         return 1 if len(self.hosts) else 2
-    
+
     def get_timeout(self):
         return 5
 
@@ -4104,7 +4136,7 @@ class ActionDevicedl(Action):
         return False
     def runint(self, actionexec, returnvalue = RV_NOT_EXECUTED):
         return 1
-    
+
 class ActionNotifystate(Action):
     def __init__(self,device,state):
         super(ActionNotifystate, self).__init__(device)
@@ -4168,17 +4200,17 @@ class ActionStateoff(ActionStatechange):
 class ActionStateon(ActionStatechange):
     def __init__(self, device):
         super(ActionStateon,self).__init__(device,1)
-        
+
 class ActionBackup(Action):
     def __str__(self, *args, **kwargs):
         return Action.__str__(self, *args, **kwargs)+" topic = "+str(self.topic)
-    
+
     def __init__(self, device,topic,convert, *args):
         super(ActionBackup,self).__init__(device)
         self.topic = topic
         self.convert = convert
         self.publish = []
-    
+
     def runint(self, actionexec, returnvalue = RV_NOT_EXECUTED):
         if isinstance(self.device,IrManager):
             self.publish = self.device.nextbackup(self.topic,self.convert)
@@ -4188,17 +4220,17 @@ class ActionBackup(Action):
                 return 2
         else:
             return 11
-    
+
     def mqtt_publish_onfinish(self,rv):
         if rv==1:
             return [dict(topic="cmnd/"+self.topic+"/learn",msg=json.dumps(self.publish),options=dict())]
         else:
             return list()
-        
+
 class ActionInsertKey(Action):
     def __str__(self, *args, **kwargs):
         return Action.__str__(self, *args, **kwargs)+" rk = "+self.remote+':'+self.key
-    
+
     def __init__(self, device,remote,key,a,other = {}, *args):
         super(ActionInsertKey,self).__init__(device)
         self.remote = remote
@@ -4206,7 +4238,7 @@ class ActionInsertKey(Action):
         self.a = self.device.get_from_arduraw({'remote':remote,'key':key,'a':a})
         self.a[2].update(other);
         self.other = other
-    
+
     def runint(self, actionexec, returnvalue = RV_NOT_EXECUTED):
         if isinstance(self.device,IrManager):
             if self.remote not in self.device.dir:
@@ -4215,7 +4247,7 @@ class ActionInsertKey(Action):
             return 1
         else:
             return 11
-    
+
     def mqtt_publish_onfinish(self,rv):
         return [dict(topic=self.device.mqtt_topic("stat","learn"),msg=json.dumps([{'remote':self.remote,'key':self.key,'status':rv}]),options=dict())]
 
@@ -4240,7 +4272,7 @@ class ActionLearnir(Action):
         rv = Action.to_json(self)
         rv.update({'irname':self.irname,'irc':self.irc})
         return rv
-            
+
     def runint(self, actionexec, returnvalue = RV_NOT_EXECUTED):
         if isinstance(self.device,IrManager):
             if self.device.backupstate==0:
@@ -4255,7 +4287,7 @@ class ActionLearnir(Action):
 
     def mqtt_publish_onfinish(self,rv):
         return [dict(topic=self.device.mqtt_topic("stat","learn"),msg=json.dumps(self.publish),options=dict())]
-    
+
     def do_presend_operations(self, actionexec):
         self.irdata = []
         while self.idx<len(self.irname):
@@ -4306,7 +4338,7 @@ class ActionLearnir(Action):
                     return 0
 
 class ActionEditraw(Action):
-    
+
     def __str__(self, *args, **kwargs):
         return Action.__str__(self, *args, **kwargs)+" ir = "+self.irshname+'/'+self.newraw
 
@@ -4355,7 +4387,7 @@ class ActionEditraw(Action):
                                 irnma = Device.dictionary[irnm]
                                 for x in irnma:
                                     if len(x):
-                                        self.device.dir[self.remote].update({x:(ircdec,'',iratt)})                            
+                                        self.device.dir[self.remote].update({x:(ircdec,'',iratt)})
                         else:
                             return 7
                     else:
@@ -4373,7 +4405,7 @@ class ActionEditraw(Action):
                             del self.device.dir[self.remote_src]
                     else:
                         return 6
-                    
+
             return 1
         else:
             return 2
@@ -4388,7 +4420,7 @@ class ActionEditraw(Action):
                      topic=self.device.mqtt_topic("stat","learn"),msg=json.dumps([dict(\
                         key=self.irshname if len(self.irshname) and self.irshname[0]=='@' else self.irname,\
                           remote=self.remote,status=rv)]),options=dict())]
-        
+
 class ActionCreatesh(Action):
 
     def modifies_device(self):
@@ -4468,7 +4500,7 @@ class ActionEmitir(Action):
         rv = Action.to_json(self)
         rv.update({'irname':self.irname,'irc':self.irc})
         return rv
-                
+
     def do_presend_operations(self, actionexec):
         while 1:
             if self.idx<len(self.irname):
@@ -4609,7 +4641,7 @@ class ActionEmitir(Action):
 
 
 class ActionViewtable(Action):
-    
+
     def modifies_device(self):
         return self.m_device
 
@@ -4758,12 +4790,12 @@ class ActionGetstate(Action):
     def __init__(self, device,*args, **kwargs):
         super(ActionGetstate,self).__init__(device)
         self.outstate = {}
-  
+
     def to_json(self):
         rv = Action.to_json(self)
         rv.update({'outstate':self.outstate})
         return rv
-    
+
     def exec_handler(self,rv,data):
         self.outstate = data
         return rv
