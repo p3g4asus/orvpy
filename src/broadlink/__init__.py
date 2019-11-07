@@ -491,7 +491,7 @@ class rm(device):
     packet = bytearray(16)
     packet[0] = 4
     response = self.send_packet(0x6a, packet)
-    if len(response):
+    if response and len(response):
         err = response[0x22] | (response[0x23] << 8)
         if err == 0:
           payload = self.decrypt(bytes(response[0x38:]))

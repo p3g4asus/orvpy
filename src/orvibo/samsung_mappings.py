@@ -24,7 +24,7 @@ samsung_mappings = {
                     "left":"KEY_LEFT",
                     "right":"KEY_RIGHT",
                     "volume+":"KEY_VOLUP",
-                    "volume-":"KEY_DOWN",
+                    "volume-":"KEY_VOLDOWN",
                     "ttx":"KEY_TTX_MIX",
                     "revw":"KEY_REWIND",
                     "stop":"KEY_STOP",
