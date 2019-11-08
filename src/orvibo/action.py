@@ -4,7 +4,6 @@ Created on 01 gen 2016
 @author: Matteo
 '''
 import socket
-import urlparse
 import threading
 import time
 import orvibo.event as event
@@ -59,6 +58,13 @@ def uunq(url)
         return urllib.unquote(url).decode("utf-8")
     else
         return urllib.parse.unquote_to_bytes(url)
+
+def upar(url)
+    if sys.version_info < (3, 0):
+        import urlparse
+        return urlparse.urlparse(url)
+    else
+        return urllib.parse.urlparse(url)
 
 def tohexbytes(data)
     if sys.version_info < (3, 0) or type(data)==bytes:
@@ -722,7 +728,7 @@ class RoughParser(object):
                     returnv['idxout'] = RoughParser.STILL_WAIT
             else:
                 print("R ["+hp[0]+":"+str(hp[1])+"] <-"+b2s(data))
-                event.EventManager.fire(eventname = 'ExtInsertAction',hp = hp,cmdline = data[1:],action = None)
+                event.EventManager.fire(eventname = 'ExtInsertAction',hp = hp,cmdline = b2s(data[1:]),action = None)
                 returnv['idxout'] = idx+1
         elif len(data)>7 and data[0:2]== MAGIC:
             msgid = data[4:6]
@@ -764,8 +770,8 @@ class RoughParser(object):
                                             name = returnv['name']+'_'+obj['uid'],\
                                             key = returnv['key'],\
                                             password = obj['password'],\
-                                            deviceid = b2s(SendBufferTimer.generatestring(32)),\
-                                            clientsessionid = b2s(SendBufferTimer.generatestring(32)),\
+                                            deviceid = SendBufferTimer.generatestring(32),\
+                                            clientsessionid = SendBufferTimer.generatestring(32),\
                                             hp2 = (obj['localIp'],obj['localPort']))
                             returnv['device'] = dev
                             act = ActionDiscovery()
@@ -777,7 +783,7 @@ class RoughParser(object):
                             returnv['disconnecttimer'] = time.time()+3*60
                 else:
                     if msgid==STATECHANGE_EXT_ID or msgid==DISCOVERY_ID:
-                        event.EventManager.fire(eventname = 'ExtChangeState',hp = hp,mac = DeviceUDP.mac_from_data(data),newstate = b"1" if data[-1:]==b'\x01' else b"0")
+                        event.EventManager.fire(eventname = 'ExtChangeState',hp = hp,mac = DeviceUDP.mac_from_data(data),newstate = "1" if data[-1:]==b'\x01' else "0")
                     returnv['idxout'] = RoughParser.UNRECOGNIZED
             else:
                 returnv['idxout'] = RoughParser.STILL_WAIT
@@ -1619,9 +1625,9 @@ class DeviceUDP(Device):
             else:
                 nm = action.name.ljust(16)
             if nm is not None:
-                record = record[0:40]+nm+record[56:]
+                record = record[0:40]+s2b(nm)+record[56:]
             if action.ip is not None:
-                record = record[0:118]+DeviceUDP.ip2string(action.ip)+DeviceUDP.ip2string(action.gateway)+DeviceUDP.ip2string(action.nmask)+b'\x00\x01'+record[132:]
+                record = record[0:118]+s2b(DeviceUDP.ip2string(action.ip)+DeviceUDP.ip2string(action.gateway)+DeviceUDP.ip2string(action.nmask))+b'\x00\x01'+record[132:]
             if action.timezone is not None:
                 record = record[0:132]+(b'\x01\x00' if action.timezone==DeviceUDP.TIMEZONE_NOT_SET else b'\x00'+struct.pack('<b',action.timezone))+record[134:]
             if action.timer_off_after_on is not None:
@@ -1783,7 +1789,7 @@ class DeviceS20(DeviceUDP):
         #    self.state = int(root.attributes['state'].value)
 
     def process_asynch_state_change(self,state):
-        self.state = state
+        self.state = b2s(state)
 
     def mqtt_publish_onfinish(self, action, retval):
         if isinstance(action, (ActionSubscribe,ActionNotifystate)):
@@ -2205,10 +2211,10 @@ class IrManager(Device):
         return out
 
     def ir_decode(self,irc):
-        return irc.decode('hex')
+        return bytesfromhex(irc)
 
     def ir_encode(self,irc):
-        return irc.encode('hex')
+        return b2s(tohexbytes(irc))
 
     def ir_att_decode(self,irc):
         return irc
@@ -2363,7 +2369,7 @@ class IrManager(Device):
                     event.EventManager.fire(eventname = 'ExtInsertAction',hp = (self.host,self.port),cmdline ="",  \
                             action = ActionBackup(self,topic,convert))
             elif sub=="learn" or sub=="emit":
-                print("topic "+msg.topic+" ["+msg.payload+"]")
+                print("topic "+msg.topic+" ["+b2s(msg.payload)+"]")
                 learnk = json.loads(msg.payload)
                 keyall = []
                 for d in learnk:
@@ -2578,7 +2584,7 @@ class DeviceUpnp(Device):
             print("Found "+str(len(devs))+" upnp devices")
             rc = {"RenderingControl":DeviceUpnpIRRC,"MainTVAgent2":DeviceUpnpIRTA2}
             for d in devs:
-                u = urlparse.urlparse(d.location)
+                u = upar(d.location)
                 for k,v in rc.items():
                     if k in d.service_map:
                         print("Found "+k+" at "+d.location)
@@ -3459,11 +3465,11 @@ class DevicePrimelan(Device):
             newstate = -newstate
         else:
             onoff = 0x30E0
-        aesc = '\x08\x00\x00\x00\x69\x00\x00\x00'+chr(onoff&0xFF)+chr(onoff>>8)+chr(int(self.id))+'\x00'+chr(int(newstate))+'\x00\x02\x02'
+        aesc = '\x08\x00\x00\x00\x69\x00\x00\x00'+struct.pack("<H", onoff)+struct.pack("<B", int(self.id))+'\x00'+struct.pack("<B",int(newstate))+'\x00\x02\x02'
         cipher = AES.new(self.key, AES.MODE_CBC, self.iv)
         aesc2 = cipher.encrypt(aesc)
         crc = DevicePrimelan.crc16(bytearray(out+aesc2))
-        return pre+chr(crc&0xFF)+chr((crc>>8)&0xFF)+out+aesc2
+        return pre+struct.pack("<H",crc)+out+aesc2
 
     def change_state_http(self,pay,timeout):
         r = requests.post('http://{}:{}/cgi-bin/web.cgi'.format(self.host,self.port), \
@@ -3500,8 +3506,8 @@ class DevicePrimelan(Device):
             self.passw = passw
             self.port2 = port2
 
-        self.key = self.passw+('\x00'*(16-len(self.passw)))
-        self.iv = reduce(lambda x,y: x+chr(ord(y[1])^y[0]),enumerate(self.key),'')
+        self.key = self.passw+(b'\x00'*(16-len(self.passw)))
+        self.iv = reduce(lambda x,y: x+struct.pack("<B",y[1]^y[0]),enumerate(self.key),b'')
 
     def to_dict(self):
         rv = Device.to_dict(self)
@@ -4071,7 +4077,7 @@ class ActionSubscribe(Action):
 class ActionDiscovery(Action):
 
     def __init__(self, primelanhost = '',primelanport=80,primelanpassw = '',primelancodu = '', primelanport2 = 0):
-        device = DeviceUDP(hp = ("255.255.255.255",0),mac = "")
+        device = DeviceUDP(hp = ("255.255.255.255",0),mac = b"")
         self.php = (primelanhost,primelanport)
         self.ppasw = primelanpassw
         self.pcodu = primelancodu
@@ -4123,7 +4129,7 @@ class ActionPause(Action):
 
 class ActionDevicedl(Action):
     def __init__(self,device = None):
-        device = DeviceUDP(hp = ("255.255.255.255",0),mac = "")
+        device = DeviceUDP(hp = ("255.255.255.255",0),mac = b"")
         self.hosts = {}
         super(ActionDevicedl, self).__init__(device)
     def to_json(self):
