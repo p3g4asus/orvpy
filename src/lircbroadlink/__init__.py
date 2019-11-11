@@ -2,7 +2,7 @@ import binascii
 import struct
 
 def pronto2lirc(pronto):
-    codes = [long(binascii.hexlify(pronto[i:i+2]), 16) for i in xrange(0, len(pronto), 2)]
+    codes = [int(binascii.hexlify(pronto[i:i+2]), 16) for i in range(0, len(pronto), 2)]
     #print 'cod = %d %d' % (len(codes),(codes[2] + codes[3]))
 
     if codes[0]:
@@ -15,7 +15,7 @@ def pronto2lirc(pronto):
     return [int(round(code / frequency)) for code in codes[4:]]
 
 def lirc2broadlink(pulses):
-    if isinstance(pulses, basestring):
+    if isinstance(pulses, bytes):
         pulses = [int(i) for i in pulses.split(',')]
     if len(pulses)%2:
         pulses.append(pulses[-1])

@@ -412,7 +412,7 @@ USAGE
                     rv = ""
                     numv = 0
                     for th in thl:
-                        if th.name[0:5]!="timer":
+                        if not th.daemon:
                             numv+=1
                         rv+= th.name+" "
                     print("TH=%s" % rv)
