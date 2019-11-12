@@ -59,9 +59,7 @@ def gendevice(devtype, host, mac, timeout):
 
 
 def discover(timeout=None, local_ip_address=None, timeout2 = 10):
-    if local_ip_address is None:
-        local_ip_address = socket.gethostbyname(socket.gethostname())
-    if local_ip_address.startswith('127.'):
+    if local_ip_address is None or local_ip_address.startswith('127.'):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(('8.8.8.8', 53))  # connecting to a UDP address doesn't send packets
         local_ip_address = s.getsockname()[0]
