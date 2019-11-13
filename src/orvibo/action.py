@@ -2813,7 +2813,7 @@ class Channel(object):
             raise ParseException(
                 'reserved field mismatch (%04x)' % _getint(buf, 10))
 
-        self.dispno = buf[12:16].rstrip(b'\x00')
+        self.dispno = b2s(buf[12:16].rstrip(b'\x00'))
 
         title_len = _getint(buf, 22)
         self.title = buf[24:24+title_len].decode('utf-8')
