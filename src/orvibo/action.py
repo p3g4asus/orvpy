@@ -2533,7 +2533,7 @@ class DeviceVirtual(Device):
 
     def do_presend_operations(self, action, actionexec):
         if isinstance(action, ActionStatechange):
-            if action.newstate in action.states_map:
+            if action.newstate in self.states_map:
                 i = 0
                 for act in self.states_map[action.newstate]:
                     realdev = self.get_real_dev(act)
