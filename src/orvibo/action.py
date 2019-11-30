@@ -506,6 +506,7 @@ class HTTPServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         self.log("write_response resp OK")
 
     def do_GET(self):
+        start_wait = time.time()
         self.log(uunq(self.path[1:]))
         self.resp_status = HTTPServerHandler.RESP_WAIT
         event.EventManager.fire(eventname='ExtInsertAction',
@@ -513,6 +514,9 @@ class HTTPServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                                 uunq(self.path[1:]), action=None)
         while self.resp_status == HTTPServerHandler.RESP_WAIT and not self.server.s.stopped:
             time.sleep(0.2)
+            if time.time() - start_wait > 30:
+                self.resp_val = {}
+                break
         self.log("write response NOW")
         self.write_response_base(self.resp_val)
         # Write the response
