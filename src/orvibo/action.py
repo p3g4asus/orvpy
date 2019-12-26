@@ -3,36 +3,39 @@ Created on 01 gen 2016
 
 @author: Matteo
 '''
+import abc
+import binascii
+import collections
+import json
+import random
+import re
+import select
 import socket
+import string
+import struct
+import sys
 import threading
 import time
-import orvibo.event as event
-import struct
-from xml.etree.ElementTree import Element, SubElement
-from xml.etree import ElementTree
-from xml.dom import minidom
-from xml.sax.saxutils import escape
 import traceback
-from datetime import datetime, date, timedelta
-import json
-import re
-import abc
-import sys
-from Crypto.Cipher import AES
-import binascii
-import random
-import string
-import collections
-import paho.mqtt.client as paho
-import broadlink
-import lircbroadlink
-import requests
 import urllib
-import select
-import upnpclient
-import samsungctl
-from orvibo.samsung_mappings import samsung_mappings
 from _collections_abc import dict_values
+from datetime import date, datetime, timedelta
+from xml.dom import minidom
+from xml.etree import ElementTree
+from xml.etree.ElementTree import Element, SubElement
+from xml.sax.saxutils import escape
+
+import broadlink
+import orvibo.event as event
+import paho.mqtt.client as paho
+import requests
+import upnpclient
+from Crypto.Cipher import AES
+from orvibo.samsung_mappings import samsung_mappings
+
+import lircbroadlink
+import samsungctl
+
 if sys.version_info < (3, 0):
     import SocketServer
     import SimpleHTTPServer
@@ -105,8 +108,10 @@ def tohexb(data):
     elif isinstance(data, str):
         return binascii.hexlify(s2b(data))
 
+
 def tohexs(data):
     return b2s(tohexb(data))
+
 
 def bfromhex(data):
     return binascii.unhexlify(data)
@@ -2966,6 +2971,7 @@ class DeviceSamsungCtl(IrManager, ManTimerManager):
             except:
                 traceback.print_exc()
                 self.destroy_device()
+                rv = None
             return action.exec_handler(rv, None)
         else:
             return IrManager.send_action(self, actionexec, action, pay)
