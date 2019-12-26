@@ -1056,12 +1056,13 @@ class ListenerTh(threading.Thread, EthSender):
             self.stopped = False
             while not self.stopped:
                 try:
-                    # print('enterrecv')
+                    print('enterrecv')
                     data, addr = self.socket.recvfrom(1024)
+                    print('1) recv %d (%s:%d) '%(0 if not data else len(data),'unkn' if not addr else addr[0],0 if not addr else addr[1]))
                     if data is not None and len(data) and self.preparse.parse(addr, data if data[0:1] != b'@' else data+b'\n')['idxout'] == RoughParser.UNRECOGNIZED:
                         event.EventManager.fire(
                             eventname='RawDataReceived', hp=addr, data=data)
-                    # print('exitrecv')
+                    print('exitrecv')
                 except:
                     traceback.print_exc()
                     break
