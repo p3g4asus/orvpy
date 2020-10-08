@@ -2501,7 +2501,7 @@ class IrManager(Device):
                         event.EventManager.fire(eventname='ExtInsertAction', hp=(self.host, self.port), cmdline="",
                                                 action=ActionInsertKey(self, d['remote'], d['key'], d['a'], {k: v for k, v in d.items() if k not in ['a', 'remote', 'key']}))
                     else:
-                        keyall.append(ksing.encode('utf-8'))
+                        keyall.append(ksing)
                 if len(keyall):
                     tall = tuple(keyall)
                     if sub == "learn":
