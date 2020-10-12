@@ -3518,6 +3518,30 @@ class DevicePrimelan(Device):
         else:
             return s
 
+    def mqtt_publish_onstart(self):
+        out = {
+            'subtype': self.subtype,
+            'nick': self.nick,
+            'state': self.state,
+            'oldstate': self.oldstate}
+        return [dict(topic=self.mqtt_topic("stat", "device"), msg=json.dumps(out), options=dict(retain=True))]
+
+    def mqtt_on_message(self, client, userdata, msg):
+        Device.mqtt_on_message(self, client, userdata, msg)
+        sub = self.mqtt_sub(msg.topic)
+        try:
+            if sub == "state":
+                event.EventManager.fire(eventname='ExtInsertAction', hp=(
+                        self.host, self.port), cmdline="", action=ActionStatechange(self, b2s(msg.payload)))
+        except:
+            traceback.print_exc()
+
+    def mqtt_publish_onfinish(self, action, retval):
+        if isinstance(action, ActionStatechange):
+            return self.mqtt_publish_onstart()
+        else:
+            return DeviceUDP.mqtt_publish_onfinish(self, action, retval)
+
     def get_action_payload(self, action):
         if isinstance(action, ActionStatechange):
             return self.state_value_conv(action.newstate)
