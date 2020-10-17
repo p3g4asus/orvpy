@@ -3756,10 +3756,11 @@ class DevicePrimelan(Device):
                 self.last_get = time.time()
                 rv = self.get_state_http(timeout)
                 if rv is not None:
-                    st = int(self.state)
-                    if st > 0 and st <= 100:
-                        self.oldstate = self.state
-                    self.state = rv
+                    if self.state != rv:
+                        st = int(self.state)
+                        if st > 0 and st <= 100:
+                            self.oldstate = self.state
+                        self.state = rv
                     rv = 1
             except:
                 traceback.print_exc()
