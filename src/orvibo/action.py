@@ -3740,7 +3740,7 @@ class DevicePrimelan(Device):
                 traceback.print_exc()
                 rv = None
             return action.exec_handler(rv, self.state)
-        elif isinstance(action, ActionNotifystate):
+        elif isinstance(action, ActionStatechange):
             timeout = action.get_timeout()
             if timeout is None or timeout < 0:
                 timeout = actionexec.udpmanager.timeout
