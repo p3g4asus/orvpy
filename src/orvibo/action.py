@@ -1058,7 +1058,7 @@ class ListenerTh(threading.Thread, EthSender):
                 try:
                     print('enterrecv')
                     data, addr = self.socket.recvfrom(1024)
-                    print('1) recv %d (%s:%d) '%(0 if not data else len(data),'unkn' if not addr else addr[0],0 if not addr else addr[1]))
+                    print('1) recv %d (%s:%d) ' % (0 if not data else len(data), 'unkn' if not addr else addr[0], 0 if not addr else addr[1]))
                     if data is not None and len(data) and self.preparse.parse(addr, data if data[0:1] != b'@' else data+b'\n')['idxout'] == RoughParser.UNRECOGNIZED:
                         event.EventManager.fire(
                             eventname='RawDataReceived', hp=addr, data=data)
@@ -3489,6 +3489,7 @@ class DevicePrimelan(Device):
     # 0: doppio pulsante
     # 2: On off slider
     # 1: slider 0-100
+    GET_STATE_ACTION = '999'
 
     def state_value_conv(self, s):
         try:
@@ -3518,6 +3519,12 @@ class DevicePrimelan(Device):
         else:
             return s
 
+    def do_postsend_operations(self, action, actionexec):
+        if isinstance(action, ActionStatechange) and action.newstate != DevicePrimelan.GET_STATE_ACTION:
+            actionexec.insert_action(ActionStatechange(self, DevicePrimelan.GET_STATE_ACTION), 1)
+        else:
+            Device.do_postsend_operations(self, action, actionexec)
+
     def mqtt_publish_onstart(self):
         out = {
             'subtype': self.subtype,
@@ -3537,7 +3544,7 @@ class DevicePrimelan(Device):
             traceback.print_exc()
 
     def mqtt_publish_onfinish(self, action, retval):
-        if isinstance(action, ActionStatechange):
+        if isinstance(action, ActionStatechange) and action.newstate == DevicePrimelan.GET_STATE_ACTION:
             return self.mqtt_publish_onstart()
         else:
             return DeviceUDP.mqtt_publish_onfinish(self, action, retval)
@@ -3654,6 +3661,19 @@ class DevicePrimelan(Device):
                           data={'tk': self.tk, 'qindex': self.qindex, 'mod': 'do_cmd', 'par': self.id, 'act': pay}, timeout=timeout)
         return 1 if r.status_code == 200 else r.status_code
 
+    def get_state_http(self, pay, timeout):
+        r = requests.post('http://{}:{}/cgi-bin/web.cgi'.format(self.host, self.port),
+                          data={'tk': self.tk, 'qindex': self.qindex, 'mod': 'cmd'}, timeout=timeout)
+        lst = r.json()['cmd']
+        for d in lst:
+            idv = d['id']
+            if idv == str(self.id):
+                if self.subtype == 1:
+                    return d['st'] if int(d['p']) > 0 else '0'
+                else:
+                    return d['st']
+        return None
+
     def change_state_tcp(self, state, timeout):
         t = TCPClient(timeout)
         return 1 if t.send_packet((self.host, self.port2), self.pkt_state(state)) > 0 else None
@@ -3706,7 +3726,7 @@ class DevicePrimelan(Device):
         return rv
 
     def send_action(self, actionexec, action, pay):
-        if isinstance(action, ActionStatechange):
+        if isinstance(action, ActionStatechange) and action.newstate != DevicePrimelan.GET_STATE_ACTION:
             timeout = action.get_timeout()
             if timeout is None or timeout < 0:
                 timeout = actionexec.udpmanager.timeout
@@ -3715,11 +3735,24 @@ class DevicePrimelan(Device):
             try:
                 state = int(pay)
                 rv = self.change_state_tcp(state, timeout)
-                if rv == 1:
+            except:
+                traceback.print_exc()
+                rv = None
+            return action.exec_handler(rv, self.state)
+        elif isinstance(action, ActionNotifystate):
+            timeout = action.get_timeout()
+            if timeout is None or timeout < 0:
+                timeout = actionexec.udpmanager.timeout
+            if timeout < 0:
+                timeout = None
+            try:
+                rv = self.get_state_http(timeout)
+                if rv is not None:
                     st = int(self.state)
                     if st > 0 and st <= 100:
                         self.oldstate = self.state
-                    self.state = pay
+                    self.state = rv
+                    rv = 1
             except:
                 traceback.print_exc()
                 rv = None
