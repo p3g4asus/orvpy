@@ -3661,7 +3661,7 @@ class DevicePrimelan(Device):
                           data={'tk': self.tk, 'qindex': self.qindex, 'mod': 'do_cmd', 'par': self.id, 'act': pay}, timeout=timeout)
         return 1 if r.status_code == 200 else r.status_code
 
-    def get_state_http(self, pay, timeout):
+    def get_state_http(self, timeout):
         r = requests.post('http://{}:{}/cgi-bin/web.cgi'.format(self.host, self.port),
                           data={'tk': self.tk, 'qindex': self.qindex, 'mod': 'cmd'}, timeout=timeout)
         lst = r.json()['cmd']
