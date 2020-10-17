@@ -1298,7 +1298,7 @@ class Device(object):
                 self.mqtt_client.publish(p["topic"], p["msg"], **p["options"])
 
     def mqtt_start(self, hp):
-        if hp is not None:
+        if hp is not None and self.mqtt_client is None:
             client = paho.Client()
             client.on_publish = self.mqtt_on_publish
             client.on_connect = self.mqtt_on_connect
