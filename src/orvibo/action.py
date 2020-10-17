@@ -3521,7 +3521,7 @@ class DevicePrimelan(Device):
             return s
 
     def do_presend_operations(self, action, actionexec):
-        if isinstance(action, ActionStatechange) and action.newstate != DevicePrimelan.GET_STATE_ACTION:
+        if isinstance(action, ActionStatechange) and action.newstate != DevicePrimelan.GET_STATE_ACTION and (self.last_get < 0 or time.time() - self.last_get > 10):
             actionexec.insert_action(ActionStatechange(self, DevicePrimelan.GET_STATE_ACTION), 0)
             return 0
         else:
@@ -3693,6 +3693,7 @@ class DevicePrimelan(Device):
         name = nn[0]
         Device.__init__(self, hp, mac, root, name)
         self.oldstate = "0"
+        self.last_get = -1
         if root is not None:
             self.id = root.attributes['id'].value
             self.subtype = int(root.attributes['subtype'].value)
@@ -3741,6 +3742,7 @@ class DevicePrimelan(Device):
         if isinstance(action, ActionStatechange) and action.newstate != DevicePrimelan.GET_STATE_ACTION:
             try:
                 state = int(pay)
+                self.last_get = -1
                 if state != int(self.state):
                     rv = self.change_state_tcp(state, timeout)
                 else:
@@ -3751,6 +3753,7 @@ class DevicePrimelan(Device):
             return action.exec_handler(rv, self.state)
         elif isinstance(action, ActionStatechange):
             try:
+                self.last_get = time.time()
                 rv = self.get_state_http(timeout)
                 if rv is not None:
                     st = int(self.state)
