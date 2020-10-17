@@ -3665,6 +3665,7 @@ class DevicePrimelan(Device):
         r = requests.post('http://{}:{}/cgi-bin/web.cgi'.format(self.host, self.port),
                           data={'tk': self.tk, 'qindex': self.qindex, 'mod': 'cmd'}, timeout=timeout)
         lst = r.json()['cmd']
+        print(f'Get state rv = {lst}')
         for d in lst:
             idv = d['id']
             if idv == str(self.id):
