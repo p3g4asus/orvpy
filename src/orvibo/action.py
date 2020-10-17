@@ -1436,7 +1436,7 @@ class Device(object):
         if root is None:
             self.host = hp[0]
             self.port = hp[1]
-            self.mac = mac
+            self.mac = s2b(mac)
             self.name = self.default_name() if not len(name) else name
             self.offlimit = 60
         else:
