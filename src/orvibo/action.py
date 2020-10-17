@@ -1927,7 +1927,7 @@ class DeviceS20(DeviceUDP):
         Device.mqtt_on_message(self, client, userdata, msg)
         sub = self.mqtt_sub(msg.topic)
         try:
-            if sub == "power":
+            if sub == "state":
                 i = int(msg.payload)
                 if i == 0 or (i == -1 and self.state == "1"):
                     event.EventManager.fire(eventname='ExtInsertAction', hp=(
