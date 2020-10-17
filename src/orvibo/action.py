@@ -3523,8 +3523,9 @@ class DevicePrimelan(Device):
     def do_presend_operations(self, action, actionexec):
         if isinstance(action, ActionStatechange) and action.newstate != DevicePrimelan.GET_STATE_ACTION:
             actionexec.insert_action(ActionStatechange(self, DevicePrimelan.GET_STATE_ACTION), 1)
+            return 1
         else:
-            Device.do_presend_operations(self, action, actionexec)
+            return Device.do_presend_operations(self, action, actionexec)
 
     def do_postsend_operations(self, action, actionexec):
         if isinstance(action, ActionStatechange) and action.newstate != DevicePrimelan.GET_STATE_ACTION:
