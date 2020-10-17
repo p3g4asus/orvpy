@@ -3490,6 +3490,7 @@ class DevicePrimelan(Device):
     # 2: On off slider
     # 1: slider 0-100
     GET_STATE_ACTION = '999'
+    TIMEOUT = 7
 
     def state_value_conv(self, s):
         try:
@@ -3518,6 +3519,12 @@ class DevicePrimelan(Device):
                 return "1"
         else:
             return s
+
+    def do_presend_operations(self, action, actionexec):
+        if isinstance(action, ActionStatechange) and action.newstate != DevicePrimelan.GET_STATE_ACTION:
+            actionexec.insert_action(ActionStatechange(self, DevicePrimelan.GET_STATE_ACTION), 1)
+        else:
+            Device.do_presend_operations(self, action, actionexec)
 
     def do_postsend_operations(self, action, actionexec):
         if isinstance(action, ActionStatechange) and action.newstate != DevicePrimelan.GET_STATE_ACTION:
@@ -3727,25 +3734,21 @@ class DevicePrimelan(Device):
         return rv
 
     def send_action(self, actionexec, action, pay):
+        timeout = action.get_timeout()
+        if timeout is None or timeout < 0:
+            timeout = DevicePrimelan.TIMEOUT
         if isinstance(action, ActionStatechange) and action.newstate != DevicePrimelan.GET_STATE_ACTION:
-            timeout = action.get_timeout()
-            if timeout is None or timeout < 0:
-                timeout = actionexec.udpmanager.timeout
-            if timeout < 0:
-                timeout = None
             try:
                 state = int(pay)
-                rv = self.change_state_tcp(state, timeout)
+                if state != int(self.state):
+                    rv = self.change_state_tcp(state, timeout)
+                else:
+                    rv = 1
             except:
                 traceback.print_exc()
                 rv = None
             return action.exec_handler(rv, self.state)
         elif isinstance(action, ActionStatechange):
-            timeout = action.get_timeout()
-            if timeout is None or timeout < 0:
-                timeout = actionexec.udpmanager.timeout
-            if timeout < 0:
-                timeout = None
             try:
                 rv = self.get_state_http(timeout)
                 if rv is not None:
