@@ -3547,7 +3547,7 @@ class DevicePrimelan(Device):
         if isinstance(action, ActionStatechange) and action.newstate == DevicePrimelan.GET_STATE_ACTION:
             return self.mqtt_publish_onstart()
         else:
-            return DeviceUDP.mqtt_publish_onfinish(self, action, retval)
+            return Device.mqtt_publish_onfinish(self, action, retval)
 
     def get_action_payload(self, action):
         if isinstance(action, ActionStatechange):
