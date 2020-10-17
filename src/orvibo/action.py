@@ -1304,7 +1304,7 @@ class Device(object):
             client.on_connect = self.mqtt_on_connect
             client.on_subscribe = self.mqtt_on_subscribe
             client.on_message = self.mqtt_on_message
-            print("mqtt_start (%s:%d)" % hp)
+            print(f"{self.name} mqtt_start ({hp[0]}:{hp[1]})")
             client.connect_async(hp[0], port=hp[1])
             client.loop_start()
             self.mqtt_client = client
