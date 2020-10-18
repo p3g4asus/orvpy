@@ -1299,7 +1299,7 @@ class Device(object):
                 if not retain or self.mqtt_topic_retain.get(p["topic"], None) != p["msg"]:
                     self.mqtt_client.publish(p["topic"], p["msg"], **p["options"])
                     if retain:
-                        self.mqtt_topic_retain.get[p["topic"]] = p["msg"]
+                        self.mqtt_topic_retain[p["topic"]] = p["msg"]
 
     def mqtt_start(self, hp):
         if hp is not None and self.mqtt_client is None:
