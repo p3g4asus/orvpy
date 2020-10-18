@@ -3493,7 +3493,9 @@ class DevicePrimelan(Device):
     TIMEOUT = 7
 
     def process_asynch_state_change(self, state):
-        self.state = state
+        if self.state != state:
+            self.oldstate = self.state
+            self.state = state
 
     def state_value_conv(self, s):
         try:

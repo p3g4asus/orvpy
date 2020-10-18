@@ -350,6 +350,7 @@ USAGE
                 action.set_devices(devices)
 
         def process_state_change(hp, newstate, devices, mac, actionexec, **kwargs):
+            print(f'ExtStateChange {mac}')
             for _, dv in devices.copy().items():
                 if mac == dv.mac:
                     act = ActionNotifystate(dv, newstate)
