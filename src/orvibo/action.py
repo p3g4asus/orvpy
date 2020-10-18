@@ -3492,6 +3492,9 @@ class DevicePrimelan(Device):
     GET_STATE_ACTION = '999'
     TIMEOUT = 7
 
+    def process_asynch_state_change(self, state):
+        self.state = state
+
     def state_value_conv(self, s):
         try:
             realv = int(s)
@@ -3552,7 +3555,9 @@ class DevicePrimelan(Device):
             traceback.print_exc()
 
     def mqtt_publish_onfinish(self, action, retval):
-        if isinstance(action, ActionStatechange) and action.newstate == DevicePrimelan.GET_STATE_ACTION:
+        if isinstance(action, ActionNotifystate) or\
+            (isinstance(action, ActionStatechange) and
+             action.newstate == DevicePrimelan.GET_STATE_ACTION):
             return self.mqtt_publish_onstart()
         else:
             return Device.mqtt_publish_onfinish(self, action, retval)
@@ -3623,11 +3628,17 @@ class DevicePrimelan(Device):
             print(lst)
             for d in lst:
                 idv = d['id']
-                dev = DevicePrimelan(hp=hp,
-                                     mac=DevicePrimelan.generate_mac(
-                                         hp[0], idv),
-                                     name=d['lb'], idv=idv, typev=d['t'], tk=tk, qindex=qindex, state=d['st'],
-                                     passw=passw, port2=port2)
+                dev = DevicePrimelan(
+                    hp=hp,
+                    mac=DevicePrimelan.generate_mac(hp[0], idv),
+                    name=d['lb'],
+                    idv=idv,
+                    typev=d['t'],
+                    tk=tk,
+                    qindex=qindex,
+                    state=DevicePrimelan.http_state_to_real_state(d),
+                    passw=passw,
+                    port2=port2)
                 out['{}:{}'.format(*hp)+':'+idv] = dev
             return out
         except:
@@ -3646,7 +3657,12 @@ class DevicePrimelan(Device):
         id2 = int(idv)
         lst.append((id2 >> 8) & 0xFF)
         lst.append(id2 & 0xFF)
-        o = map(lambda x: chr(int(x)), lst)
+        o = []
+        for x in lst:
+            try:
+                o.append(chr(int(x)))
+            except Exception:
+                o.extend([s for s in x])
         return ''.join(o)
 
     def pkt_state(self, newstate):
@@ -3669,19 +3685,27 @@ class DevicePrimelan(Device):
                           data={'tk': self.tk, 'qindex': self.qindex, 'mod': 'do_cmd', 'par': self.id, 'act': pay}, timeout=timeout)
         return 1 if r.status_code == 200 else r.status_code
 
+    @staticmethod
+    def http_state_to_real_state(d):
+        return d['st'] if d['t'] != "1" or int(d['p']) > 0 else '0'
+
     def get_state_http(self, timeout):
         r = requests.post('http://{}:{}/cgi-bin/web.cgi'.format(self.host, self.port),
                           data={'tk': self.tk, 'qindex': self.qindex, 'mod': 'cmd'}, timeout=timeout)
         lst = r.json()['cmd']
         print(f'Get state rv = {lst}')
+        rv = None
         for d in lst:
             idv = d['id']
             if idv == str(self.id):
-                if self.subtype == 1:
-                    return d['st'] if int(d['p']) > 0 else '0'
-                else:
-                    return d['st']
-        return None
+                rv = DevicePrimelan.http_state_to_real_state(d)
+            else:
+                event.EventManager.fire(
+                    eventname='ExtChangeState',
+                    hp=(self.host, self.port),
+                    mac=DevicePrimelan.generate_mac(self.host, idv),
+                    newstate=DevicePrimelan.http_state_to_real_state(d))
+        return rv
 
     def change_state_tcp(self, state, timeout):
         t = TCPClient(timeout)
