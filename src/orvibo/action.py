@@ -3705,7 +3705,7 @@ class DevicePrimelan(Device):
                 event.EventManager.fire(
                     eventname='ExtChangeState',
                     hp=(self.host, self.port),
-                    mac=DevicePrimelan.generate_mac(self.host, idv),
+                    mac=s2b(DevicePrimelan.generate_mac(self.host, idv)),
                     newstate=DevicePrimelan.http_state_to_real_state(d))
         return rv
 
