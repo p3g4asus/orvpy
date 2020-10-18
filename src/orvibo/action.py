@@ -1295,7 +1295,11 @@ class Device(object):
     def mqtt_publish_all(self, lsttopic):
         if self.mqtt_client:
             for p in lsttopic:
-                self.mqtt_client.publish(p["topic"], p["msg"], **p["options"])
+                retain = p["options"].get('retain', False)
+                if not retain or self.mqtt_topic_retain.get(p["topic"], None) != p["msg"]:
+                    self.mqtt_client.publish(p["topic"], p["msg"], **p["options"])
+                    if retain:
+                        self.mqtt_topic_retain.get[p["topic"]] = p["msg"]
 
     def mqtt_start(self, hp):
         if hp is not None and self.mqtt_client is None:
@@ -1452,6 +1456,7 @@ class Device(object):
         self.timers = None
         self.offt = 0
         self.mqtt_client = None
+        self.mqtt_topic_retain = dict()
 
     def copy_extra_from(self, already_saved_device):
         self.timers = already_saved_device.timers
@@ -3493,6 +3498,7 @@ class DevicePrimelan(Device):
     TIMEOUT = 7
 
     def process_asynch_state_change(self, state):
+        self.last_get = time.time()
         if self.state != state:
             self.oldstate = self.state
             self.state = state
