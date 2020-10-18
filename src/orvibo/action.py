@@ -3785,14 +3785,17 @@ class DevicePrimelan(Device):
             return action.exec_handler(rv, self.state)
         elif isinstance(action, ActionStatechange):
             try:
-                self.last_get = time.time()
-                rv = self.get_state_http(timeout)
-                if rv is not None:
-                    if self.state != rv:
-                        st = int(self.state)
-                        if st > 0 and st <= 100:
-                            self.oldstate = self.state
-                        self.state = rv
+                if self.last_get < 0 or time.time() - self.last_get > 10:
+                    self.last_get = time.time()
+                    rv = self.get_state_http(timeout)
+                    if rv is not None:
+                        if self.state != rv:
+                            st = int(self.state)
+                            if st > 0 and st <= 100:
+                                self.oldstate = self.state
+                            self.state = rv
+                        rv = 1
+                else:
                     rv = 1
             except:
                 traceback.print_exc()
