@@ -25,6 +25,7 @@ def init_logger(name, level=None):
         return logging.getLogger(name) if nmref != name else loggerobj
     _LOGGER = logging.getLogger(nmref)
     _LOGGER.setLevel(_loglevel)
+    _LOGGER.propagate = False
     handler = logging.StreamHandler(sys.stdout)
     handler.setLevel(_loglevel)
     _LOGGERS[nmref] = dict(lo=_LOGGER, ha=handler)
