@@ -333,8 +333,7 @@ class SendBufferTimer(object):
     def handle_incoming_data(data, key=PK_KEY):
         try:
             valasci = binascii.crc32(data[42:])
-            _LOGGER.info("K=%s Computed CRC %08X vs %s" %
-                  (b2s(key), valasci, tohexs(data[6:10])))
+            _LOGGER.info(f"K={b2s(key)} Computed CRC %08X vs {tohexs(data[6:10])}" % valasci)
             if valasci == struct.unpack('>i', data[6:10])[0]:
                 cry = AES.new(s2b(key), AES.MODE_ECB)
                 msg = cry.decrypt(data[42:])
@@ -484,10 +483,7 @@ class HTTPServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         self.request.settimeout(60)
 
     def log(self, msg):
-        _LOGGER.info("[%s] (%s:%d) -> %s" % (self.__class__.__name__,
-                                      self.client_address[0],
-                                      self.client_address[1],
-                                      msg))
+        _LOGGER.info(f"[{self.__class__.__name__}] ({self.client_address[0]}:{self.client_address[1]}) -> {msg}")
 
     def schedule_response(self, randid, action, **kwargs):
         self.log("action parsed")
@@ -1149,8 +1145,7 @@ class UdpManager(object):
             if len(payload) > 0 and retval != RV_DATA_WAIT:
                 try:
                     self.sender.send_packet(hp2, payload)
-                    _LOGGER.info("S [{}:{}] -> {}".format(hp2[0],
-                                                   hp2[1], tohexs(payload)))
+                    _LOGGER.info(f"S [{hp[0]}:{hp[1]}] -> {tohexs(payload)}")
                 except:
                     traceback.print_exc()
                     return None
@@ -1294,8 +1289,7 @@ class Device(object):
         client.subscribe(lsttopic)
 
     def mqtt_on_message(self, client, userdata, msg):
-        _LOGGER.info(self.name+" MSG "+msg.topic +
-              " ("+str(msg.qos)+")-> "+b2s(msg.payload))
+        _LOGGER.info(f"{self.name} MSG {msg.topic} ({msg.qos})-> {b2s(msg.payload)}")
 
     def mqtt_publish_all(self, lsttopic):
         if self.mqtt_client:
@@ -1468,7 +1462,6 @@ class Device(object):
         self.port = already_saved_device.port
         self.host = already_saved_device.host
         self.offlimit = already_saved_device.offlimit
-        self.mqtt_client = already_saved_device.mqtt_client
 
     def to_dict(self):
         # a = datetime(1900,1,1,0,0,0)

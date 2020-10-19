@@ -287,14 +287,15 @@ USAGE
                     # _LOGGER.info("changed "+str(v))
                     devices.update({v.name: v})
                     action.m_device = True
-                    if len(mqtt_host):
-                        v.mqtt_start((mqtt_host, mqtt_port))
                 else:
+                    already_saved_device.on_stop()
                     v.copy_extra_from(already_saved_device)
                     v.name = already_saved_device.name
                     if isinstance(v, IrManager):
                         v.set_emit_delay(emit_delay)
                     devices.update({already_saved_device.name: v})
+                if len(mqtt_host):
+                    v.mqtt_start((mqtt_host, mqtt_port))
             connect_devices(devices)
 
         def save_modified_devices(save_filename, save_devices, debug, device, action, **kwargs):
