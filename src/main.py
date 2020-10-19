@@ -19,7 +19,6 @@ It defines classes_and_methods
 
 import argparse as ap
 import json
-import logging
 import os
 import re
 import shlex
@@ -37,11 +36,14 @@ from orvibo.action import (DEVICE_SAVE_FLAG_MAIN, DEVICE_SAVE_FLAG_TABLE,
                            ActionViewtable4, Device, DeviceS20, IrManager,
                            class_forname)
 from orvibo.event import EventManager
+from util import init_logger
 
 __all__ = []
 __version__ = 0.1
 __date__ = '2016-01-04'
 __updated__ = '2016-01-04'
+
+_LOGGER = init_logger(__name__, level=logging.DEBUG)
 
 DEBUG = 0
 TESTRUN = 0
@@ -140,23 +142,23 @@ class ActionAction(ap.Action):
     def create_action(values, devices):
         if len(values) >= 1:
             clname = values[0] if isinstance(values, list) else values
-            print('orvibo.action.Action'+clname.title())
+            _LOGGER.info('orvibo.action.Action'+clname.title())
             cls = class_forname('orvibo.action.Action'+clname.title())
             if cls is not None:
                 try:
-                    '''print("ci sono qui -1 ")'''
+                    '''_LOGGER.info("ci sono qui -1 ")'''
                     t = tuple()
                     if isinstance(values, list) and len(values) > 1:
-                        '''print("ci sono qui 0 ")'''
+                        '''_LOGGER.info("ci sono qui 0 ")'''
                         if values[1] in devices:
                             dev = devices[values[1]]
                             t = (dev,)
                         else:
                             t = (values[1],)
-                        '''print("ci sono qui 1 "+str(t))'''
+                        '''_LOGGER.info("ci sono qui 1 "+str(t))'''
                         if len(values) > 2:
                             t += tuple(values[2:])
-                    '''print('tuple '+str(t)+" val "+str(values))'''
+                    '''_LOGGER.info('tuple '+str(t)+" val "+str(values))'''
                     return cls(*t)
                 except:
                     traceback.print_exc()
@@ -174,7 +176,7 @@ class ActionAction(ap.Action):
         if act is None:
             raise ap.ArgumentError(str(values) + ' is not a valid action')
         else:
-            print(str(act))
+            _LOGGER.info(str(act))
             attr.append(act)
 
 
@@ -270,18 +272,18 @@ USAGE
 
         def add_discovered_devices(action, devices, mqtt_host, mqtt_port, emit_delay, **kwargs):
             for _, v in action.hosts.copy().items():
-                # print("current "+k+" nm "+v.name+" lndv "+str(len(devices)))
+                # _LOGGER.info("current "+k+" nm "+v.name+" lndv "+str(len(devices)))
                 already_saved_device = None
-                # print("Confronto "+v.name)
+                # _LOGGER.info("Confronto "+v.name)
                 for _, dv in devices.copy().items():
-                    # print("VS "+v.name+'/'+dv.name)
+                    # _LOGGER.info("VS "+v.name+'/'+dv.name)
                     if v.mac == dv.mac:
                         already_saved_device = dv
                         break
                     # elif v.name==dv.name:
-                    #    print("Are you sure? "+v.name+"->"+v.mac.encode('hex')+"/"+dv.mac.encode('hex'))
+                    #    _LOGGER.info("Are you sure? "+v.name+"->"+v.mac.encode('hex')+"/"+dv.mac.encode('hex'))
                 if already_saved_device is None:
-                    # print("changed "+str(v))
+                    # _LOGGER.info("changed "+str(v))
                     devices.update({v.name: v})
                     action.m_device = True
                     if len(mqtt_host):
@@ -295,7 +297,7 @@ USAGE
             connect_devices(devices)
 
         def save_modified_devices(save_filename, save_devices, debug, device, action, **kwargs):
-            # print("lensv "+str(len(save_devices)))
+            # _LOGGER.info("lensv "+str(len(save_devices)))
             save = True
             if isinstance(action, ActionDiscovery):
                 save = debug or action.modifies_device()
@@ -323,7 +325,7 @@ USAGE
 
         def terminate_on_finish(actionexec, force=False, **kwargs):
             if force or actionexec.action_list_len() <= 1:
-                print("Terminating...")
+                _LOGGER.info("Terminating...")
                 global term_called
                 term_called = True
 
@@ -350,11 +352,11 @@ USAGE
                 action.set_devices(devices)
 
         def process_state_change(hp, newstate, devices, mac, actionexec, **kwargs):
-            print(f'ExtStateChange {mac}')
+            _LOGGER.info(f'ExtStateChange {mac}')
             for _, dv in devices.copy().items():
                 if mac == dv.mac:
                     act = ActionNotifystate(dv, newstate)
-                    actionexec.insert_action(act)
+                    actionexec.insert_action(act, 1)
 
         def mqtt_on_connect(client, userdata, flags, rc):
             client.subscribe([("cmnd/#", 0,)])
@@ -372,7 +374,7 @@ USAGE
             client = paho.Client(userdata=ud)
             client.on_connect = mqtt_on_connect
             client.on_message = mqtt_on_message
-            print("mqtt_start (%s:%d)" % hp)
+            _LOGGER.info("mqtt_start (%s:%d)" % hp)
             client.connect_async(hp[0], port=hp[1])
             client.loop_start()
             return client
@@ -383,7 +385,7 @@ USAGE
 
         # Process arguments
         signal(SIGTERM, sigterm_handler)
-        print("Parsing args")
+        _LOGGER.info("Parsing args")
         args = parser.parse_args()
         mqtt_client = None
         if len(args.mqtt_host):
@@ -391,7 +393,7 @@ USAGE
                 d.mqtt_start((args.mqtt_host, args.mqtt_port))
             mqtt_client = mqtt_init((args.mqtt_host, args.mqtt_port), args)
 
-        print(str(args))
+        _LOGGER.info(str(args))
         connect_devices(args.devices)
         actionexec = ActionExecutor()
         if not args.active_on_finish:
@@ -434,12 +436,12 @@ USAGE
                         if not th.daemon:
                             numv += 1
                         rv += th.name + " "
-                    print("TH=%s" % rv)
+                    _LOGGER.info("TH=%s" % rv)
                 elif term_called:
                     raise KeyboardInterrupt
             except KeyboardInterrupt:
                 if not stopped:
-                    print("Stopping")
+                    _LOGGER.info("Stopping")
                     stopped = True
                     actionexec.stop()
                     if mqtt_client:

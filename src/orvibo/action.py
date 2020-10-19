@@ -7,6 +7,7 @@ import abc
 import binascii
 import collections
 import json
+import logging
 import random
 import re
 import select
@@ -32,6 +33,7 @@ import requests
 import upnpclient
 from Crypto.Cipher import AES
 from orvibo.samsung_mappings import samsung_mappings
+from ..util import init_logger
 
 import lircbroadlink
 import samsungctl
@@ -45,6 +47,9 @@ else:
     import http.server as SimpleHTTPServer
     from _collections_abc import dict_keys
     from functools import reduce
+
+
+_LOGGER = init_logger(__name__, level=logging.DEBUG)
 
 
 def s2b(data):
@@ -204,7 +209,7 @@ class TCPServerHandler(SocketServer.BaseRequestHandler):
         self.stopped = False
         keyv = '{}:{}'.format(*self.client_address)
         threading.currentThread().name = ("TCPServerHandler")
-        print(keyv+" connected")
+        _LOGGER.info(keyv+" connected")
         self.request.setblocking(0)
         olddata = b''
         serv = self.server.s
@@ -221,7 +226,7 @@ class TCPServerHandler(SocketServer.BaseRequestHandler):
                 if ready[0]:
                     data = self.request.recv(4096)
                     if len(data) > 0:
-                        print("RTCP ["+keyv+"/"+str(len(data))+"] <-"+tohexs(data))
+                        _LOGGER.info("RTCP ["+keyv+"/"+str(len(data))+"] <-"+tohexs(data))
                         data = olddata+data
                         while True:
                             dictout = parser.parse(
@@ -255,11 +260,11 @@ class TCPServerHandler(SocketServer.BaseRequestHandler):
                     if len(remain) == 0:
                         remain = serv.dowrite(self.client_address)
                     if len(remain) > 0:
-                        print("Sending packet to %s:%d" % self.client_address)
+                        _LOGGER.info("Sending packet to %s:%d" % self.client_address)
                         nb = self.request.send(remain)
-                        print("Sent")
+                        _LOGGER.info("Sent")
                         # if tp=="cry":
-                        #    print("STCP ["+keyv+"/"+str(len(remain))+"/"+str(nb)+"] <-"+remain.encode('hex'))
+                        #    _LOGGER.info("STCP ["+keyv+"/"+str(len(remain))+"/"+str(nb)+"] <-"+remain.encode('hex'))
                         remain = remain[nb:]
                         wlist = [self.request]
                     else:
@@ -267,9 +272,9 @@ class TCPServerHandler(SocketServer.BaseRequestHandler):
             except:
                 traceback.print_exc()
                 break
-        print(keyv+" DISCONNECTED")
+        _LOGGER.info(keyv+" DISCONNECTED")
         serv.unsetclientinfo(self.client_address)
-        print(keyv+" DELETED")
+        _LOGGER.info(keyv+" DELETED")
         self.stop()
 
 
@@ -328,12 +333,12 @@ class SendBufferTimer(object):
     def handle_incoming_data(data, key=PK_KEY):
         try:
             valasci = binascii.crc32(data[42:])
-            print("K=%s Computed CRC %08X vs %s" %
+            _LOGGER.info("K=%s Computed CRC %08X vs %s" %
                   (b2s(key), valasci, tohexs(data[6:10])))
             if valasci == struct.unpack('>i', data[6:10])[0]:
                 cry = AES.new(s2b(key), AES.MODE_ECB)
                 msg = cry.decrypt(data[42:])
-                print("Decrypted MSG %s" % b2s(msg))
+                _LOGGER.info("Decrypted MSG %s" % b2s(msg))
                 jsono = json.loads(msg[0:msg.rfind(b'}')+1])
                 return {'msg': jsono, 'convid': b2s(data[10:42])}
         except:
@@ -351,7 +356,7 @@ class SendBufferTimer(object):
             if rv is not None:
                 exitv = self.action.device.receive_handler(
                     self.addr, self.action, rv['msg'])
-                print("exitv = "+str(exitv))
+                _LOGGER.info("exitv = "+str(exitv))
                 if exitv is not None and exitv != RV_DATA_WAIT:
                     self.set_finished(exitv)
             return rv
@@ -376,9 +381,9 @@ class SendBufferTimer(object):
         threading.currentThread().name = ("manage_timeout")
         if self.status < self.retry:
             self.timer = None
-            print("Timeout in action Retry!")
+            _LOGGER.info("Timeout in action Retry!")
         else:
-            print("Timeout in action fail!")
+            _LOGGER.info("Timeout in action fail!")
             self.set_finished(None)
 
     def has_failed(self):
@@ -391,7 +396,7 @@ class SendBufferTimer(object):
         if self.action is not None and self.timeout is not None and self.timeout > 0:
             self.timer = threading.Timer(self.timeout, self.manage_timeout, ())
             self.timer.start()
-            print("Scheduling timeouttimer "+str(self.timeout))
+            _LOGGER.info("Scheduling timeouttimer "+str(self.timeout))
         else:
             self.status = SendBufferTimer.ACTION_OK
         return self.get_send_bytes2()
@@ -422,7 +427,7 @@ class SendBufferTimer(object):
             if 'key' in jsono and jsono['key'] is None:
                 jsono['key'] = SendBufferTimer.generatestring(16)
             msg = s2b(json.dumps(jsono))
-            print("Encrypting with %s MSG %s" % (b2s(key), b2s(msg)))
+            _LOGGER.info("Encrypting with %s MSG %s" % (b2s(key), b2s(msg)))
             lnmsg = len(msg)
             remain = lnmsg % 16
             if remain > 0:
@@ -479,7 +484,7 @@ class HTTPServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         self.request.settimeout(60)
 
     def log(self, msg):
-        print("[%s] (%s:%d) -> %s" % (self.__class__.__name__,
+        _LOGGER.info("[%s] (%s:%d) -> %s" % (self.__class__.__name__,
                                       self.client_address[0],
                                       self.client_address[1],
                                       msg))
@@ -579,7 +584,7 @@ class HTTPServer(threading.Thread):
         if not self.stopped:
             s = str(action.randomid)
             client = None
-            print("Searching http client")
+            _LOGGER.info("Searching http client")
             self.cond.acquire()
             if s in self.actions:
                 client = self.actions[s]
@@ -648,19 +653,19 @@ class TCPServer(threading.Thread):
     def unsetclientinfo(self, addr):
         self.cond.acquire()
         keyv = '{}:{}'.format(*addr)
-        # print("02_unsetting %s" %keyv)
+        # _LOGGER.info("02_unsetting %s" %keyv)
         if keyv in self.towrite:
-            # print("02_found in towrite")
+            # _LOGGER.info("02_found in towrite")
             for x in self.towrite[keyv]:
                 if isinstance(x, SendBufferTimer):
                     x.set_finished(None)
-                    # print("02_setfinish")
+                    # _LOGGER.info("02_setfinish")
             del self.towrite[keyv]
         if keyv in self.clientinfo:
-            # print("02_found in clientinfo")
+            # _LOGGER.info("02_found in clientinfo")
             del self.clientinfo[keyv]
         if keyv in self.clienthandler:
-            # print("02_found in clienthandler")
+            # _LOGGER.info("02_found in clienthandler")
             self.clienthandler[keyv].stop()
             del self.clienthandler[keyv]
         self.cond.release()
@@ -710,10 +715,10 @@ class TCPServer(threading.Thread):
                 snd = self.towrite[keyv][0]
                 if isinstance(snd, (bytes, str)):
                     snd = s2b(self.towrite[keyv].pop(0))
-                    # print("01_1")
+                    # _LOGGER.info("01_1")
                 elif snd.timer is not None:  # dobbiamo aspettare la risposta
                     snd = b''
-                    # print("01_2")
+                    # _LOGGER.info("01_2")
                     break
                 elif snd.has_succeeded() or snd.has_failed():
                     if "sender" in self.clientinfo[keyv]:
@@ -722,12 +727,12 @@ class TCPServer(threading.Thread):
                         self.clientinfo[keyv]['disconnecttimer'] = time.time()
                     self.towrite[keyv].pop(0)
                     snd = b''
-                    # print("01_3")
+                    # _LOGGER.info("01_3")
                 else:  # dobbiamo ancora spedire il pacchetto o c'e gia stato un timeout ma dobbiamo fare altri tentativi
                     snd.clientinfo = self.clientinfo[keyv]
                     self.clientinfo[keyv]['sender'] = snd
                     snd = snd.schedule()
-                    # print("01_4")
+                    # _LOGGER.info("01_4")
 
         self.cond.release()
         return snd
@@ -799,14 +804,14 @@ class RoughParser(object):
                 else:
                     returnv['idxout'] = RoughParser.STILL_WAIT
             else:
-                print("R ["+hp[0]+":"+str(hp[1])+"] <-"+b2s(data))
+                _LOGGER.info("R ["+hp[0]+":"+str(hp[1])+"] <-"+b2s(data))
                 event.EventManager.fire(eventname='ExtInsertAction', hp=hp,
                                         cmdline=b2s(data[1:]), action=None)
                 returnv['idxout'] = idx+1
         elif len(data) > 7 and data[0:2] == MAGIC:
             msgid = data[4:6]
             ln = struct.unpack('>H', data[2:4])[0]
-            print("Detected Magic with ln %d and id %s" % (ln, b2s(msgid)))
+            _LOGGER.info("Detected Magic with ln %d and id %s" % (ln, b2s(msgid)))
             if len(data) >= ln:
                 returnv['type'] = b'cry' if msgid == PK_MSG_ID or msgid == DK_MSG_ID else b'orv'
                 returnv['idxout'] = ln
@@ -926,9 +931,9 @@ class ActionExecutor(threading.Thread):
             self.asynch_action = None
             self.asynch_action_rv = rv
             self.asynch_action_l.notify_all()
-            # print("WE "+str(act)+"/"+str(rv))
+            # _LOGGER.info("WE "+str(act)+"/"+str(rv))
         else:
-            # print("NE "+str(act)+"/"+str(rv)+"/"+str(self.asynch_action))
+            # _LOGGER.info("NE "+str(act)+"/"+str(rv)+"/"+str(self.asynch_action))
             rv = None
         self.asynch_action_l.release()
         return rv
@@ -948,15 +953,15 @@ class ActionExecutor(threading.Thread):
             self.notify_asynch_action_done(None, None)
             self.stopped_ev.wait()
         if self.tcpserver is not None:
-            print("Stopping TCP Server")
+            _LOGGER.info("Stopping TCP Server")
             self.tcpserver.stop()
             self.tcpserver = None
         if self.httpserver is not None:
-            print("Stopping TCP Server")
+            _LOGGER.info("Stopping TCP Server")
             self.httpserver.stop()
             self.httpserver = None
         if self.udpmanager is not None:
-            print("Stopping UDPManager")
+            _LOGGER.info("Stopping UDPManager")
             self.udpmanager.stop()
             self.udpmanager = None
 
@@ -986,19 +991,19 @@ class ActionExecutor(threading.Thread):
 
             while not self.stopped:
                 self.action_list_l.acquire()
-                # print("ecco00 "+str(len(self.action_list)))
-                # print("ecco00 "+str(self.action_list))
+                # _LOGGER.info("ecco00 "+str(len(self.action_list)))
+                # _LOGGER.info("ecco00 "+str(self.action_list))
                 if len(self.action_list):
                     act = self.action_list[0]
                 else:
                     act = None
                 self.action_list_l.release()
                 if act is not None:
-                    print("Runing action "+str(act))
+                    _LOGGER.info("Runing action "+str(act))
                     retval = act.run(self)
                     if retval == RV_ASYNCH_EXEC:
                         retval = self.wait_asynch_action_done(act)
-                    print("Action "+str(act)+" run ("+str(retval)+")")
+                    _LOGGER.info("Action "+str(act)+" run ("+str(retval)+")")
                     if retval is None or retval > 0:
                         self.action_list_l.acquire()
                         if self.stopped:
@@ -1056,13 +1061,13 @@ class ListenerTh(threading.Thread, EthSender):
             self.stopped = False
             while not self.stopped:
                 try:
-                    print('enterrecv')
+                    _LOGGER.info('enterrecv')
                     data, addr = self.socket.recvfrom(1024)
-                    print('1) recv %d (%s:%d) ' % (0 if not data else len(data), 'unkn' if not addr else addr[0], 0 if not addr else addr[1]))
+                    _LOGGER.info('1) recv %d (%s:%d) ' % (0 if not data else len(data), 'unkn' if not addr else addr[0], 0 if not addr else addr[1]))
                     if data is not None and len(data) and self.preparse.parse(addr, data if data[0:1] != b'@' else data+b'\n')['idxout'] == RoughParser.UNRECOGNIZED:
                         event.EventManager.fire(
                             eventname='RawDataReceived', hp=addr, data=data)
-                    print('exitrecv')
+                    _LOGGER.info('exitrecv')
                 except:
                     traceback.print_exc()
                     break
@@ -1086,14 +1091,14 @@ class UdpManager(object):
     def add_to_buffer(self, hp, data, **kwargs):
         rx = re.compile(MAGIC+b'(.{2}).{2}.*'+MAC_START)
         self.buffer_l.acquire()
-        # print("unsplit R <-"+data.encode('hex'))
+        # _LOGGER.info("unsplit R <-"+data.encode('hex'))
         control = {}
         while True:
             m = re.search(rx, data)
             if m:
                 st = m.start()
                 ln = struct.unpack('>H', m.group(1))[0]
-                # print("st = {} ln = {}".format(st,ln))
+                # _LOGGER.info("st = {} ln = {}".format(st,ln))
                 off = st+ln
                 if off <= len(data):
                     sect = data[st:off]
@@ -1102,7 +1107,7 @@ class UdpManager(object):
                     if keyv not in control:
                         control[keyv] = 1
                         self.buffer[keyv] = EthBuffCont(hp, sect)
-                        print("R ["+keyv+"] <-"+tohexs(sect))
+                        _LOGGER.info("R ["+keyv+"] <-"+tohexs(sect))
                 else:
                     break
             else:
@@ -1144,7 +1149,7 @@ class UdpManager(object):
             if len(payload) > 0 and retval != RV_DATA_WAIT:
                 try:
                     self.sender.send_packet(hp2, payload)
-                    print("S [{}:{}] -> {}".format(hp2[0],
+                    _LOGGER.info("S [{}:{}] -> {}".format(hp2[0],
                                                    hp2[1], tohexs(payload)))
                 except:
                     traceback.print_exc()
@@ -1152,21 +1157,21 @@ class UdpManager(object):
             if handler is None:
                 return 5
             elif broadcast:
-                # print('broadc')
+                # _LOGGER.info('broadc')
                 time.sleep(timeout)
                 break
             else:
-                # print('no broadc')
+                # _LOGGER.info('no broadc')
                 u.buffer_l.acquire()
-                # print('acquired')
+                # _LOGGER.info('acquired')
                 buffcont = u.buffer.get(keyv, None)
                 if buffcont is None:
                     now = time.time()
                     once = False
                     while time.time() < now+timeout or not once:
-                        # print("waiting")
+                        # _LOGGER.info("waiting")
                         u.buffer_l.wait(timeout)
-                        # print("waiting f")
+                        # _LOGGER.info("waiting f")
                         once = True
                         buffcont = u.buffer.get(keyv, None)
                         if buffcont is not None or u.listener is None:
@@ -1177,7 +1182,7 @@ class UdpManager(object):
                 elif buffcont:
                     retval = handler(buffcont.addr, action,
                                      buffcont.data, **kwargs)
-                    # print('Handler returned '+str(retval))
+                    # _LOGGER.info('Handler returned '+str(retval))
                     # Return as soon as a response is received
                     if retval is not None and retval != RV_DATA_WAIT:
                         break
@@ -1211,14 +1216,14 @@ class UdpManager(object):
 
     def stop(self):
         if self.listener is not None:
-            print("Stopping Listener Thread")
+            _LOGGER.info("Stopping Listener Thread")
             self.listener.stop()
-            print("Listener Thread Stopped")
+            _LOGGER.info("Listener Thread Stopped")
             self.listener = None
         if self.sender is not None:
-            print("Stopping Sender")
+            _LOGGER.info("Stopping Sender")
             self.sender.stop()
-            print("Sender Stopped")
+            _LOGGER.info("Sender Stopped")
 
 
 def class_forname(kls):
@@ -1277,19 +1282,19 @@ class Device(object):
         return []  # lista di dict con topic msg e options(retain, qos)
 
     def mqtt_on_subscribe(self, client, userdata, mid, granted_qos):
-        print(self.name+" subscribed: "+str(mid)+" "+str(granted_qos))
+        _LOGGER.info(self.name+" subscribed: "+str(mid)+" "+str(granted_qos))
 
     def mqtt_on_publish(self, client, userdata, mid):
-        print(self.name+" pub mid: "+str(mid))
+        _LOGGER.info(self.name+" pub mid: "+str(mid))
 
     def mqtt_on_connect(self, client, userdata, flags, rc):
-        print(self.name+" CONNACK received with code %d." % (rc))
+        _LOGGER.info(self.name+" CONNACK received with code %d." % (rc))
         self.mqtt_publish_all(self.mqtt_publish_onstart())
         lsttopic = self.mqtt_subscribe_topics()
         client.subscribe(lsttopic)
 
     def mqtt_on_message(self, client, userdata, msg):
-        print(self.name+" MSG "+msg.topic +
+        _LOGGER.info(self.name+" MSG "+msg.topic +
               " ("+str(msg.qos)+")-> "+b2s(msg.payload))
 
     def mqtt_publish_all(self, lsttopic):
@@ -1308,7 +1313,7 @@ class Device(object):
             client.on_connect = self.mqtt_on_connect
             client.on_subscribe = self.mqtt_on_subscribe
             client.on_message = self.mqtt_on_message
-            print(f"{self.name} mqtt_start ({hp[0]}:{hp[1]})")
+            _LOGGER.info(f"{self.name} mqtt_start ({hp[0]}:{hp[1]})")
             client.connect_async(hp[0], port=hp[1])
             client.loop_start()
             self.mqtt_client = client
@@ -1359,7 +1364,7 @@ class Device(object):
         xmldoc = minidom.parse(fn)
         items = xmldoc.getElementsByTagName('device')
         Device.dictionary_parse(xmldoc)
-        print("Dictionary has %d items" % len(Device.dictionary))
+        _LOGGER.info("Dictionary has %d items" % len(Device.dictionary))
         devices = {}
         for item in items:
             try:
@@ -1532,14 +1537,14 @@ class DeviceUDP(Device):
                 elif data.find(DISCOVERY_S20) >= 0:
                     typed = DeviceS20
                 else:
-                    print("Unknown device type %s %s" %
+                    _LOGGER.info("Unknown device type %s %s" %
                           (keyv, tohexs(data[31:37])))
                     continue
                 dev = typed(hp=buffcont.addr, mac=data[7:13],
                             sec1900=struct.unpack('<I', data[37:41])[0])
-                print("Discovered device %s" % dev)
+                _LOGGER.info("Discovered device %s" % dev)
                 hosts[keyv] = dev
-                print("ln = "+str(len(hosts))+" h = "+str(keyv))
+                _LOGGER.info("ln = "+str(len(hosts))+" h = "+str(keyv))
         return hosts
 
     @staticmethod
@@ -1603,7 +1608,7 @@ class DeviceUDP(Device):
         ln = len(data)
         self.tablever = {}
         while start+8 <= ln:
-            '''print("allv = "+data[start+2:start+8].encode('hex'))'''
+            '''_LOGGER.info("allv = "+data[start+2:start+8].encode('hex'))'''
             vern = struct.unpack('<H', data[start+2:start+4])[0]
             tabn = struct.unpack('<H', data[start+4:start+6])[0]
             flgn = struct.unpack('<H', data[start+6:start+8])[0]
@@ -2495,13 +2500,13 @@ class IrManager(Device):
                     event.EventManager.fire(eventname='ExtInsertAction', hp=(self.host, self.port), cmdline="",
                                             action=ActionBackup(self, topic, convert))
             elif sub == "learn" or sub == "emit":
-                print("topic "+msg.topic+" ["+b2s(msg.payload)+"]")
+                _LOGGER.info("topic "+msg.topic+" ["+b2s(msg.payload)+"]")
                 learnk = json.loads(msg.payload)
                 keyall = []
                 for d in learnk:
                     ksing = ('' if d['key'][0] == '@' or d['key'][0]
                              == '$' else (d["remote"]+':'))+d["key"]
-                    # print("KSING "+ksing+" "+str(type(ksing)))
+                    # _LOGGER.info("KSING "+ksing+" "+str(type(ksing)))
                     if 'a' in d and 'remote' in d and len(d['remote']):
                         event.EventManager.fire(eventname='ExtInsertAction', hp=(self.host, self.port), cmdline="",
                                                 action=ActionInsertKey(self, d['remote'], d['key'], d['a'], {k: v for k, v in d.items() if k not in ['a', 'remote', 'key']}))
@@ -2556,7 +2561,7 @@ class DeviceVirtual(Device):
                         randid = 8950+i
                         i += 1
                         actcmd = "%d statechange %s %s" % (randid, d, act["s"])
-                        print("Scheduling "+actcmd)
+                        _LOGGER.info("Scheduling "+actcmd)
                         event.EventManager.fire(eventname='ExtInsertAction',
                                                 cmdline=actcmd, action=None)
                 self.state = action.newstate
@@ -2576,7 +2581,7 @@ class DeviceVirtual(Device):
         elif d == "$lasttargetnone":
             if len(self.state):
                 d2 = self.get_last_target_from_state()
-        print("D is "+d+" Real Dev is "+str(d2))
+        _LOGGER.info("D is "+d+" Real Dev is "+str(d2))
         return d2
 
     def states_xml_device_node_parse(self, root, lst, nicks):
@@ -2709,16 +2714,16 @@ class DeviceUpnp(Device):
     def discovery(timeout=5):
         out = {}
         try:
-            print("Searching upnp devices")
+            _LOGGER.info("Searching upnp devices")
             devs = upnpclient.discover(timeout=5)
-            print("Found "+str(len(devs))+" upnp devices")
+            _LOGGER.info("Found "+str(len(devs))+" upnp devices")
             rc = {"RenderingControl": DeviceUpnpIRRC,
                   "MainTVAgent2": DeviceUpnpIRTA2}
             for d in devs:
                 u = upar(d.location)
                 for k, v in rc.items():
                     if k in d.service_map:
-                        print("Found "+k+" at "+d.location)
+                        _LOGGER.info("Found "+k+" at "+d.location)
                         hp = (u.hostname, u.port)
                         m = '{}:{}:'.format(*hp)+k
                         out[m] = v(hp=hp,
@@ -2968,7 +2973,7 @@ class DeviceSamsungCtl(IrManager, ManTimerManager):
         if isinstance(action, ActionEmitir):
             try:
                 if self.init_device():
-                    print(self.name+" sending "+pay[0])
+                    _LOGGER.info(self.name+" sending "+pay[0])
                     if not self.remote.control(pay[0]):
                         rv = 5
                         self.destroy_device()
@@ -3056,7 +3061,7 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
             self.samsungctl_dev_name = root.attributes['samsungctl_dev_name'].value
             self.tv_source = root.attributes['tv_source'].value
 
-        # print("LOC "+self.upnp_drc_location)
+        # _LOGGER.info("LOC "+self.upnp_drc_location)
         if deviceobj is not None:
             self.init_device()
 
@@ -3105,7 +3110,7 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                     tp = pay[2]["type"]
                     if tp == DeviceUpnpIR.SOURCE_KEY:
                         return self.dir[rem][key]
-                # print("JJJ "+key+" "+str(self.upnp_drc_dev.dir))
+                # _LOGGER.info("JJJ "+key+" "+str(self.upnp_drc_dev.dir))
                 if self.upnp_rc_dev and len(self.upnp_rc_dev.dir):
                     rv = self.upnp_rc_dev.get_dir(
                         next(iter(self.upnp_rc_dev.dir.keys())), key)
@@ -3219,7 +3224,7 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                             if 'Result' in vv and vv['Result'] == "OK":
                                 rv = 1
                             else:
-                                print("Change channel rv "+str(vv))
+                                _LOGGER.info("Change channel rv "+str(vv))
                                 rv = 127
                         else:
                             rv = 255
@@ -3231,7 +3236,7 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                             if 'Result' in vv and vv['Result'] == "OK":
                                 rv = 1
                             else:
-                                print("Change source rv "+str(vv))
+                                _LOGGER.info("Change source rv "+str(vv))
                                 rv = 127
                         else:
                             rv = 255
@@ -3326,7 +3331,7 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
 
             pos += 124
 
-        print('Parsed %d channels' % len(channels))
+        _LOGGER.info('Parsed %d channels' % len(channels))
         return channels
 
 
@@ -3377,9 +3382,9 @@ class DeviceUpnpIRRC(DeviceUpnpIR):
 
     def get_dir(self, rem, key):
         if self.init_device():
-            # print("KKK "+key+" "+rem+str(self.dir))
+            # _LOGGER.info("KKK "+key+" "+rem+str(self.dir))
             if rem in self.dir:
-                # print("UUU "+key+" "+rem)
+                # _LOGGER.info("UUU "+key+" "+rem)
                 mo = re.search("^([^0-9\\+\\-]+)([0-9]*)([\\+\\-]?)$", key)
                 if mo is not None:
                     fp = mo.group(1)+("+"*len(mo.group(3)))
@@ -3387,7 +3392,7 @@ class DeviceUpnpIRRC(DeviceUpnpIR):
                         p = mo.group(2)
                         return (key, int(p) if len(p) else 1, {"type": DeviceUpnpIR.RC_KEY})
                 mo = re.search("^([^#\\+\\-]+)([\\+\\-]?)#([0-9]+)$", key)
-                # print("DDDD "+key+" "+rem)
+                # _LOGGER.info("DDDD "+key+" "+rem)
                 if mo is not None:
                     fp = mo.group(1)+("+"*len(mo.group(2)))
                     if fp in self.dir[rem]:
@@ -3453,10 +3458,10 @@ class DeviceUpnpIRRC(DeviceUpnpIR):
                     p[a.argsdef_in[2][0]] = str(val)
                     out = a(**p)
                     self.get_states([k])
-                    print("Calling method upnp "+k+" out "+str(out))
+                    _LOGGER.info("Calling method upnp "+k+" out "+str(out))
                     return self.states[k]
             except:
-                print("Action Set"+k+" args "+str(self.a['Set'+k].argsdef_in))
+                _LOGGER.info("Action Set"+k+" args "+str(self.a['Set'+k].argsdef_in))
                 self.destroy_device()
                 traceback.print_exc()
         return None
@@ -3481,7 +3486,7 @@ class DeviceUpnpIRRC(DeviceUpnpIR):
                         if rv < 500:
                             rv += 500
                             self.state_init = True
-                    print(self.name+" Upnp State "+k+" = "+str(st))
+                    _LOGGER.info(self.name+" Upnp State "+k+" = "+str(st))
                 except:
                     traceback.print_exc()
         if rv >= 500:
@@ -3532,7 +3537,7 @@ class DevicePrimelan(Device):
             return s
 
     def do_presend_operations(self, action, actionexec):
-        if isinstance(action, ActionStatechange) and action.newstate != DevicePrimelan.GET_STATE_ACTION and (self.last_get < 0 or time.time() - self.last_get > 10):
+        if isinstance(action, ActionStatechange) and action.newstate != DevicePrimelan.GET_STATE_ACTION:
             actionexec.insert_action(ActionStatechange(self, DevicePrimelan.GET_STATE_ACTION), 0)
             return 0
         else:
@@ -3628,12 +3633,12 @@ class DevicePrimelan(Device):
             for div in divs:
                 tk = div.attributes['tk'].value
                 qindex = div.attributes['qindex'].value
-            print('received '+txt+" tk = "+tk+" qindex = "+qindex)
+            _LOGGER.info('received '+txt+" tk = "+tk+" qindex = "+qindex)
             r = requests.post('http://{}:{}/cgi-bin/web.cgi'.format(*hp),
                               data={'tk': tk, 'qindex': qindex, 'mod': 'cmd'}, timeout=timeout)
             lst = r.json()['cmd']
             out = {}
-            print(lst)
+            _LOGGER.info(lst)
             for d in lst:
                 idv = d['id']
                 dev = DevicePrimelan(
@@ -3698,21 +3703,26 @@ class DevicePrimelan(Device):
         return d['st'] if d['t'] != "1" or int(d['p']) > 0 else '0'
 
     def get_state_http(self, timeout):
-        r = requests.post('http://{}:{}/cgi-bin/web.cgi'.format(self.host, self.port),
-                          data={'tk': self.tk, 'qindex': self.qindex, 'mod': 'cmd'}, timeout=timeout)
-        lst = r.json()['cmd']
-        print(f'Get state rv = {lst}')
-        rv = None
-        for d in lst:
-            idv = d['id']
-            if idv == str(self.id):
-                rv = DevicePrimelan.http_state_to_real_state(d)
-            else:
-                event.EventManager.fire(
-                    eventname='ExtChangeState',
-                    hp=(self.host, self.port),
-                    mac=s2b(DevicePrimelan.generate_mac(self.host, idv)),
-                    newstate=DevicePrimelan.http_state_to_real_state(d))
+        now = time.time()
+        if now - self.last_get > 10:
+            r = requests.post('http://{}:{}/cgi-bin/web.cgi'.format(self.host, self.port),
+                              data={'tk': self.tk, 'qindex': self.qindex, 'mod': 'cmd'}, timeout=timeout)
+            lst = r.json()['cmd']
+            _LOGGER.info(f'Get state (difftime = {now - self.last_get}) rv = {lst}')
+            rv = None
+            self.last_get = now
+            for d in lst:
+                idv = d['id']
+                if idv == str(self.id):
+                    rv = DevicePrimelan.http_state_to_real_state(d)
+                else:
+                    event.EventManager.fire(
+                        eventname='ExtChangeState',
+                        hp=(self.host, self.port),
+                        mac=s2b(DevicePrimelan.generate_mac(self.host, idv)),
+                        newstate=DevicePrimelan.http_state_to_real_state(d))
+        else:
+            rv = self.state
         return rv
 
     def change_state_tcp(self, state, timeout):
@@ -3785,17 +3795,13 @@ class DevicePrimelan(Device):
             return action.exec_handler(rv, self.state)
         elif isinstance(action, ActionStatechange):
             try:
-                if self.last_get < 0 or time.time() - self.last_get > 10:
-                    self.last_get = time.time()
-                    rv = self.get_state_http(timeout)
-                    if rv is not None:
-                        if self.state != rv:
-                            st = int(self.state)
-                            if st > 0 and st <= 100:
-                                self.oldstate = self.state
-                            self.state = rv
-                        rv = 1
-                else:
+                rv = self.get_state_http(timeout)
+                if rv is not None:
+                    if self.state != rv:
+                        st = int(self.state)
+                        if st > 0 and st <= 100:
+                            self.oldstate = self.state
+                        self.state = rv
                     rv = 1
             except:
                 traceback.print_exc()
@@ -3888,7 +3894,7 @@ class DeviceRM(IrManager, ManTimerManager):
                                 freq = 0
                             data = {'irc': data2, 'attrs': {'freq': freq}}
                 else:
-                    print("S(%s:%d)-> %s" %
+                    _LOGGER.info("S(%s:%d)-> %s" %
                           (self.inner.host+(tohexs(pay[0]),)))
                     response = self.inner.send_data(pay[0])
                     if response is None:
@@ -3900,7 +3906,7 @@ class DeviceRM(IrManager, ManTimerManager):
                 rv = None
             if rv is None or rv != 0:
                 # Forzo futura riconnessione
-                print("Blackbeam %s error: will try to reconnect" % self.name)
+                _LOGGER.info("Blackbeam %s error: will try to reconnect" % self.name)
                 self.inner = None
                 if rv is not None:
                     rv += 600
@@ -3995,8 +4001,8 @@ class DeviceCT10(IrManager, ManTimerManager):
             self.deviceId = root.attributes['deviceId'].value
             self.localPort = root.attributes['localPort'].value
             self.localIp = root.attributes['localIp'].value
-            # print("HERE1 "+str(self.dir))
-            # print("HERE2 "+str(self.sh))
+            # _LOGGER.info("HERE1 "+str(self.dir))
+            # _LOGGER.info("HERE2 "+str(self.sh))
             # self.dir_file_min(self.dir)
             # self.sh_file_min(self.sh)
 
@@ -4290,7 +4296,7 @@ class Action(object):
                 now = time.time()
                 self.device.offt = now
         else:
-            # print("non va be "+str(0 if self.device is None else 1)+" "+str(now-self.device.offt))
+            # _LOGGER.info("non va be "+str(0 if self.device is None else 1)+" "+str(now-self.device.offt))
             rv = None
         if rv is None or rv > 0:
             event.EventManager.fire(eventname=self.__class__.__name__,
@@ -4454,7 +4460,7 @@ class ActionIrask(Action):
         return False
 
     def runint(self, actionexec, returnvalue=RV_NOT_EXECUTED):
-        print("Please press "+self.irname)
+        _LOGGER.info("Please press "+self.irname)
         return 1
 
     def to_json(self):
@@ -5210,7 +5216,7 @@ class ActionSynctimers(Action):
             return 0
         elif self.idx < len(self.out['timers']):
             t = self.out['timers'][self.idx]
-            print("timer "+str(t))
+            _LOGGER.info("timer "+str(t))
             actionexec.insert_action(ActionSettable3(self.device, *tuple(t['action'].split(' ')),
                                                      datev="%02d/%02d/%04d" % (t['day'],
                                                                                t['month'], t['year']),
