@@ -33,7 +33,7 @@ import requests
 import upnpclient
 from Crypto.Cipher import AES
 from orvibo.samsung_mappings import samsung_mappings
-from ..util import init_logger
+from util import init_logger
 
 import lircbroadlink
 import samsungctl
@@ -999,7 +999,7 @@ class ActionExecutor(threading.Thread):
                     act = None
                 self.action_list_l.release()
                 if act is not None:
-                    _LOGGER.info("Runing action "+str(act))
+                    _LOGGER.info(f"Running action {act} dev={None if not act.device else id(act.device)}")
                     retval = act.run(self)
                     if retval == RV_ASYNCH_EXEC:
                         retval = self.wait_asynch_action_done(act)
@@ -3504,6 +3504,7 @@ class DevicePrimelan(Device):
 
     def process_asynch_state_change(self, state):
         self.last_get = time.time()
+        _LOGGER.info(f"{id(self)} {self.name} last_get = {self.last_get}")
         if self.state != state:
             self.oldstate = self.state
             self.state = state

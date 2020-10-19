@@ -19,6 +19,7 @@ It defines classes_and_methods
 
 import argparse as ap
 import json
+import logging
 import os
 import re
 import shlex
@@ -54,7 +55,7 @@ term_called = False
 
 def sigterm_handler(_signo, _stack_frame):
     global term_called
-    logging.info("SIGTERM RECEIVED")
+    _LOGGER.info("SIGTERM RECEIVED")
     term_called = True
 
 
