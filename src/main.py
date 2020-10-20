@@ -17,24 +17,33 @@ It defines classes_and_methods
 @deffield    updated: Updated
 '''
 
-import sys
-import os,traceback,threading,time,logging,re
-from orvibo.event import EventManager
 import argparse as ap
-from orvibo.action import class_forname,Device,DeviceS20,\
-    ActionViewtable4,ActionEmitir, IrManager, ActionDiscovery,\
-    ActionViewtable, ActionStatechange, DEVICE_SAVE_FLAG_MAIN, ActionPause,\
-    DEVICE_SAVE_FLAG_TABLE, ActionViewtable1, ActionSubscribe, ActionExecutor,\
-    ActionNotifystate
-from signal import signal,SIGTERM
-import paho.mqtt.client as paho
 import json
+import logging
+import os
+import re
 import shlex
+import sys
+import threading
+import time
+import traceback
+from signal import SIGTERM, signal
+
+import paho.mqtt.client as paho
+from action import (ActionDiscovery, ActionEmitir, ActionExecutor,
+                    ActionNotifystate, ActionPause, ActionStatechange,
+                    ActionSubscribe, ActionViewtable, ActionViewtable1,
+                    ActionViewtable4, Device, DeviceS20, IrManager)
+from device import DEVICE_SAVE_FLAG_MAIN, DEVICE_SAVE_FLAG_TABLE
+from event import EventManager
+from util import class_forname, init_logger
 
 __all__ = []
 __version__ = 0.1
 __date__ = '2016-01-04'
 __updated__ = '2016-01-04'
+
+_LOGGER = init_logger(__name__, level=logging.DEBUG)
 
 DEBUG = 0
 TESTRUN = 0
@@ -42,78 +51,87 @@ PROFILE = 0
 
 term_called = False
 
+
 def sigterm_handler(_signo, _stack_frame):
     global term_called
-    logging.info("SIGTERM RECEIVED")
+    _LOGGER.info("SIGTERM RECEIVED")
     term_called = True
+
 
 def valid_retry(val):
     try:
         v = int(val)
-        if v<0:
+        if v < 0:
             raise ap.ArgumentTypeError('')
-    except:
+    except: # noqa: E722
         raise ap.ArgumentTypeError('Retry must be>0; '+val+' not valid')
     return v
 
+
 def valid_host(hostname):
-    if len(hostname) > 255 or len(hostname)==0:
+    if len(hostname) > 255 or len(hostname) == 0:
         return False
     if hostname[-1] == ".":
-        hostname = hostname[:-1] # strip exactly one dot from the right, if present
-    allowed = re.compile("(?!-)[A-Z\d-]{1,63}(?<!-)$", re.IGNORECASE)
+        hostname = hostname[:-1]  # strip exactly one dot from the right, if present
+    allowed = re.compile(r"(?!-)[A-Z\d-]{1,63}(?<!-)$", re.IGNORECASE)
     return hostname if all(allowed.match(x) for x in hostname.split(".")) else ''
+
 
 def valid_port(val):
     try:
         v = int(val)
-        if v<0 or v>65535:
+        if v < 0 or v > 65535:
             raise ap.ArgumentTypeError('')
-    except:
+    except: # noqa: E722
         raise ap.ArgumentTypeError('Port must be>=1025 and <=65535; '+val+' not valid')
     return v
+
 
 def valid_code(val):
     try:
         v = int(val)
-        if v<0 or v>9999 or len(val)!=4:
+        if v < 0 or v > 9999 or len(val) != 4:
             raise ap.ArgumentTypeError('')
-    except:
+    except: # noqa: E722
         raise ap.ArgumentTypeError('Code must be>=0000 and <=9999; '+val+' not valid')
     return val
+
 
 def valid_timeout(val):
     try:
         v = float(val)
-        if v<0.5:
+        if v < 0.5:
             raise ap.ArgumentTypeError('')
-    except:
+    except: # noqa: E722
         raise ap.ArgumentTypeError('Timeout must be>=0.5; '+val+' not valid')
     return v
-    
+
+
 def valid_delay(val):
     try:
         v = float(val)
-        if v<0.3 and v!=0:
+        if v < 0.3 and v != 0:
             raise ap.ArgumentTypeError('')
-    except:
+    except: # noqa: E722
         raise ap.ArgumentTypeError('Delay must be>=0.3 or 0; '+val+' not valid')
     return v
+
 
 class ActionConf(ap.Action):
     def __init__(self, option_strings, dest, **kwargs):
         super(ActionConf, self).__init__(option_strings, dest, **kwargs)
+
     def __call__(self, parser, namespace, values, option_string=None):
-        setattr(namespace,self.dest, values)
+        setattr(namespace, self.dest, values)
         if os.path.exists(values):
             try:
                 devices = Device.load(values)
-                setattr(namespace,'devices', devices)
-            except:
+                setattr(namespace, 'devices', devices)
+            except: # noqa: E722
                 traceback.print_exc()
                 raise ap.ArgumentError(values+' is not a valid conf file')
         else:
-            setattr(namespace,'devices', {})
+            setattr(namespace, 'devices', {})
 
 
 class ActionAction(ap.Action):
@@ -121,44 +139,44 @@ class ActionAction(ap.Action):
         super(ActionAction, self).__init__(option_strings, dest, **kwargs)
 
     @staticmethod
-    def create_action(values,devices):
-        if len(values)>=1:
+    def create_action(values, devices):
+        if len(values) >= 1:
             clname = values[0] if isinstance(values, list) else values
-            print('orvibo.action.Action'+clname.title())
-            cls = class_forname('orvibo.action.Action'+clname.title())
+            _LOGGER.info('action.Action'+clname.title())
+            cls = class_forname('action.Action'+clname.title())
             if cls is not None:
                 try:
-                    '''print("ci sono qui -1 ")'''
+                    '''_LOGGER.info("ci sono qui -1 ")'''
                     t = tuple()
-                    if isinstance(values, list) and len(values)>1:
-                        '''print("ci sono qui 0 ")'''
+                    if isinstance(values, list) and len(values) > 1:
+                        '''_LOGGER.info("ci sono qui 0 ")'''
                         if values[1] in devices:
                             dev = devices[values[1]]
                             t = (dev,)
                         else:
                             t = (values[1],)
-                        '''print("ci sono qui 1 "+str(t))'''
-                        if len(values)>2:
+                        '''_LOGGER.info("ci sono qui 1 "+str(t))'''
+                        if len(values) > 2:
                             t += tuple(values[2:])
-                    '''print('tuple '+str(t)+" val "+str(values))'''
+                    '''_LOGGER.info('tuple '+str(t)+" val "+str(values))'''
                     return cls(*t)
-                except:
+                except: # noqa: E722
                     traceback.print_exc()
         return None
 
     def __call__(self, parser, namespace, values, option_string=None):
-        devices = getattr(namespace,'devices', None)
+        devices = getattr(namespace, 'devices', None)
         if devices is None:
             raise ap.ArgumentError('Invalid conf argument: must be before the first action')
-        attr = getattr(namespace,self.dest, None)
+        attr = getattr(namespace, self.dest, None)
         if attr is None:
             setattr(namespace, self.dest, list())
-            attr = getattr(namespace,self.dest, None)
+            attr = getattr(namespace, self.dest, None)
         act = ActionAction.create_action(values, devices)
         if act is None:
-            raise ap.ArgumentError(str(values)+' is not a valid action')
+            raise ap.ArgumentError(str(values) + ' is not a valid action')
         else:
-            print(str(act))
+            _LOGGER.info(str(act))
             attr.append(act)
 
 
@@ -167,12 +185,15 @@ class CLIError(Exception):
     def __init__(self, msg):
         super(CLIError).__init__(type(self))
         self.msg = "E: %s" % msg
+
     def __str__(self):
         return self.msg
+
     def __unicode__(self):
         return self.msg
 
-def main(argv=None): # IGNORE:C0111
+
+def main(argv=None):  # IGNORE:C0111
     '''Command line options.'''
 
     if argv is None:
@@ -204,80 +225,80 @@ USAGE
         parser = ap.ArgumentParser(description=program_license, formatter_class=ap.RawDescriptionHelpFormatter)
         parser.add_argument("-c", "--conf", dest="conf", action=ActionConf)
         parser.add_argument("-b", "--broadcast", dest="broadcast")
-        parser.add_argument("-m", "--mqtt-host", dest="mqtt_host",type=valid_host)
-        parser.add_argument("-k", "--mqtt-port", dest="mqtt_port",type=valid_port)
-        parser.add_argument("-f", "--prime-host", dest="prime_host",type=valid_host)
-        parser.add_argument("-y", "--prime-port", dest="prime_port",type=valid_port)
-        parser.add_argument("-w", "--prime-port2", dest="prime_port2",type=valid_port)
-        parser.add_argument("-q", "--prime-code", dest="prime_code",type=valid_code)
+        parser.add_argument("-m", "--mqtt-host", dest="mqtt_host", type=valid_host)
+        parser.add_argument("-k", "--mqtt-port", dest="mqtt_port", type=valid_port)
+        parser.add_argument("-f", "--prime-host", dest="prime_host", type=valid_host)
+        parser.add_argument("-y", "--prime-port", dest="prime_port", type=valid_port)
+        parser.add_argument("-w", "--prime-port2", dest="prime_port2", type=valid_port)
+        parser.add_argument("-q", "--prime-code", dest="prime_code", type=valid_code)
         parser.add_argument("-z", "--prime-pass", dest="prime_pass")
-        parser.add_argument("-p", "--port", dest="port",type=valid_port)
-        parser.add_argument("-s", "--tcpport", dest="tcpport",type=valid_port)
-        parser.add_argument("-g", "--httpport", dest="httpport",type=valid_port)
-        parser.add_argument("-t", "--timeout", dest="timeout",type=valid_timeout)
-        parser.add_argument("-j", "--emitdelay", dest="emit_delay",type=valid_delay)
-        parser.add_argument("-r", "--retry", dest="retry",type=valid_retry)
-        parser.add_argument("-a", "--action", dest="actions", nargs='+',action=ActionAction)
+        parser.add_argument("-p", "--port", dest="port", type=valid_port)
+        parser.add_argument("-s", "--tcpport", dest="tcpport", type=valid_port)
+        parser.add_argument("-g", "--httpport", dest="httpport", type=valid_port)
+        parser.add_argument("-t", "--timeout", dest="timeout", type=valid_timeout)
+        parser.add_argument("-j", "--emitdelay", dest="emit_delay", type=valid_delay)
+        parser.add_argument("-r", "--retry", dest="retry", type=valid_retry)
+        parser.add_argument("-a", "--action", dest="actions", nargs='+', action=ActionAction)
         parser.add_argument('-x', '--active_on_finish', action='store_true', dest="active_on_finish")
         parser.add_argument('-V', '--version', action='version', version=program_version_message)
         parser.add_argument('-d', '--debug', action='store_true', dest="debug")
         parser.add_argument('-e', '--remote', action='store_true', dest="remote")
 
-
-        parser.set_defaults(conf = os.path.join(os.getcwd(),'devices.xml'),
-                            devices = {},
-                            mqtt_host = '',
-                            mqtt_port = 1883,
-                            emit_delay = 0,
-                            port = 10000,
-                            tcpport = 2802,
-                            httpport = 2803,
-                            actions = [],
-                            broadcast = '255.255.255.255',
-                            active_on_finish = False,
-                            timeout = 1,
-                            retry = 3,
-                            debug = False,
-                            remote = False,
-                            prime_host = '',
-                            prime_port = 80,
-                            prime_port2 = 6004,
-                            prime_code = '',
-                            prime_pass = ''
+        parser.set_defaults(conf=os.path.join(os.getcwd(), 'devices.xml'),
+                            devices={},
+                            mqtt_host='',
+                            mqtt_port=1883,
+                            emit_delay=0,
+                            port=10000,
+                            tcpport=2802,
+                            httpport=2803,
+                            actions=[],
+                            broadcast='255.255.255.255',
+                            active_on_finish=False,
+                            timeout=1,
+                            retry=3,
+                            debug=False,
+                            remote=False,
+                            prime_host='',
+                            prime_port=80,
+                            prime_port2=6004,
+                            prime_code='',
+                            prime_pass=''
                             )
-        
+
         def connect_devices(devices):
-            for _,dv in devices.copy().items():
+            for _, dv in devices.copy().items():
                 dv.connect_devices(devices)
-        
-        def add_discovered_devices(action,devices,mqtt_host,mqtt_port,emit_delay,**kwargs):
-            for _,v in action.hosts.copy().items():
-                #print("current "+k+" nm "+v.name+" lndv "+str(len(devices)))
+
+        def add_discovered_devices(action, devices, mqtt_host, mqtt_port, emit_delay, **kwargs):
+            for _, v in action.hosts.copy().items():
+                # _LOGGER.info("current "+k+" nm "+v.name+" lndv "+str(len(devices)))
                 already_saved_device = None
-                #print("Confronto "+v.name)
-                for _,dv in devices.copy().items():
-                    #print("VS "+v.name+'/'+dv.name)
-                    if v.mac==dv.mac:
+                # _LOGGER.info("Confronto "+v.name)
+                for _, dv in devices.copy().items():
+                    # _LOGGER.info("VS "+v.name+'/'+dv.name)
+                    if v.mac == dv.mac:
                         already_saved_device = dv
                         break
-                    #elif v.name==dv.name:
-                    #    print("Are you sure? "+v.name+"->"+v.mac.encode('hex')+"/"+dv.mac.encode('hex'))
+                    # elif v.name==dv.name:
+                    #    _LOGGER.info("Are you sure? "+v.name+"->"+v.mac.encode('hex')+"/"+dv.mac.encode('hex'))
                 if already_saved_device is None:
-                    #print("changed "+str(v))
-                    devices.update({v.name:v})
+                    # _LOGGER.info("changed "+str(v))
+                    devices.update({v.name: v})
                     action.m_device = True
-                    if len(mqtt_host):
-                        v.mqtt_start((mqtt_host,mqtt_port))
                 else:
+                    already_saved_device.on_stop()
                     v.copy_extra_from(already_saved_device)
                     v.name = already_saved_device.name
                     if isinstance(v, IrManager):
                         v.set_emit_delay(emit_delay)
-                    devices.update({already_saved_device.name:v})
+                    devices.update({already_saved_device.name: v})
+                if len(mqtt_host):
+                    v.mqtt_start((mqtt_host, mqtt_port))
             connect_devices(devices)
 
-        def save_modified_devices(save_filename,save_devices,debug,device,action,**kwargs):
-            #print("lensv "+str(len(save_devices)))
+        def save_modified_devices(save_filename, save_devices, debug, device, action, **kwargs):
+            # _LOGGER.info("lensv "+str(len(save_devices)))
             save = True
             if isinstance(action, ActionDiscovery):
                 save = debug or action.modifies_device()
@@ -287,7 +308,7 @@ USAGE
                     save = debug
                 elif isinstance(action, ActionViewtable4):
                     dn = device.default_name()
-                    if dn in save_devices and dn!=device.name:
+                    if dn in save_devices and dn != device.name:
                         del save_devices[dn]
                         save_devices[device.name] = device
                         save = True
@@ -300,102 +321,103 @@ USAGE
             elif isinstance(action, ActionStatechange) or isinstance(action, ActionSubscribe):
                 save = debug
             if save:
-                Device.save(save_devices,save_filename,
+                Device.save(save_devices, save_filename,
                             (DEVICE_SAVE_FLAG_MAIN | DEVICE_SAVE_FLAG_TABLE) if debug else DEVICE_SAVE_FLAG_MAIN)
 
-        def terminate_on_finish(actionexec,force = False,**kwargs):
-            if force or actionexec.action_list_len()<=1:
-                print("Terminating...")
+        def terminate_on_finish(actionexec, force=False, **kwargs):
+            if force or actionexec.action_list_len() <= 1:
+                _LOGGER.info("Terminating...")
                 global term_called
                 term_called = True
 
-        def do_timer_action(device,timerobj,actionexec,**kwargs):
-            act = ActionEmitir(device,*tuple(timerobj['action'].split(' ')))
+        def do_timer_action(device, timerobj, actionexec, **kwargs):
+            act = ActionEmitir(device, *tuple(timerobj['action'].split(' ')))
             actionexec.insert_action(act)
 
-        def insert_arrived_action(cmdline,action,devices,actionexec,pos = -1,**kwargs):
+        def insert_arrived_action(cmdline, action, devices, actionexec, pos=-1, **kwargs):
             if action is None:
                 spl = shlex.split(cmdline)
-                if len(spl)>1:
+                if len(spl) > 1:
                     action = ActionAction.create_action(spl[1:], devices)
                     randid = -1
                     if action is not None:
                         randid = int(spl[0])
                         action.set_randomid(randid)
-                        EventManager.fire(eventname = 'ActionParsed',randid = randid,action = action)
-                        actionexec.insert_action(action,pos)
+                        EventManager.fire(eventname='ActionParsed', randid=randid, action=action)
+                        actionexec.insert_action(action, pos)
             else:
-                actionexec.insert_action(action,pos)
-                
-        def handle_device_dl(action,devices,**kwargs):
+                actionexec.insert_action(action, pos)
+
+        def handle_device_dl(action, devices, **kwargs):
             if action is not None:
                 action.set_devices(devices)
 
-        def process_state_change(hp,newstate,devices,mac,actionexec,**kwargs):
-            for _,dv in devices.copy().items():
-                if mac==dv.mac:
-                    act = ActionNotifystate(dv,newstate)
-                    actionexec.insert_action(act)
-        
+        def process_state_change(hp, newstate, devices, mac, actionexec, **kwargs):
+            _LOGGER.info(f'ExtStateChange {mac}')
+            for _, dv in devices.copy().items():
+                if mac == dv.mac:
+                    act = ActionNotifystate(dv, newstate)
+                    actionexec.insert_action(act, 1)
+
         def mqtt_on_connect(client, userdata, flags, rc):
-            client.subscribe([("cmnd/#",0,)])
-            
+            client.subscribe([("cmnd/#", 0,)])
+
         def mqtt_on_message(client, userdata, msg):
             topic = msg.topic
             i = topic.rfind("/")
-            if i>=0 and i<len(topic)-1:
+            if i >= 0 and i < len(topic) - 1:
                 sub = topic[i+1:]
-                if sub=="devicedl":
+                if sub == "devicedl":
                     resp = json.dumps(userdata.devices)
-                    client.publish("stat/devicedl",resp)
-        
-        def mqtt_init(hp,ud):
+                    client.publish("stat/devicedl", resp)
+
+        def mqtt_init(hp, ud):
             client = paho.Client(userdata=ud)
             client.on_connect = mqtt_on_connect
             client.on_message = mqtt_on_message
-            print("mqtt_start (%s:%d)" % hp)
-            client.connect_async(hp[0],port=hp[1])
+            _LOGGER.info("mqtt_start (%s:%d)" % hp)
+            client.connect_async(hp[0], port=hp[1])
             client.loop_start()
             return client
-        
+
         def mqtt_stop(client):
             client.loop_stop()
             client.disconnect()
 
         # Process arguments
         signal(SIGTERM, sigterm_handler)
-        print("Parsing args")
+        _LOGGER.info("Parsing args")
         args = parser.parse_args()
         mqtt_client = None
         if len(args.mqtt_host):
-            for _,d in args.devices.copy().items():
-                d.mqtt_start((args.mqtt_host,args.mqtt_port))
-            mqtt_client = mqtt_init((args.mqtt_host,args.mqtt_port),args);
+            for _, d in args.devices.copy().items():
+                d.mqtt_start((args.mqtt_host, args.mqtt_port))
+            mqtt_client = mqtt_init((args.mqtt_host, args.mqtt_port), args)
 
-        print(str(args))
+        _LOGGER.info(str(args))
         connect_devices(args.devices)
         actionexec = ActionExecutor()
         if not args.active_on_finish:
-            EventManager.on('ActionDone', terminate_on_finish,actionexec = actionexec)
-        pars = {'save_filename':args.conf,'save_devices':args.devices,'debug':args.debug}
-        EventManager.on('TimerAction', do_timer_action,actionexec = actionexec,**pars)
-        EventManager.on('ActionDiscovery', add_discovered_devices,devices = args.devices,mqtt_host=args.mqtt_host,mqtt_port=args.mqtt_port,emit_delay=args.emit_delay)
-        EventManager.on('ExtInsertAction',insert_arrived_action,devices = args.devices,actionexec = actionexec)
-        EventManager.on('ExtChangeState',process_state_change,actionexec = actionexec,devices = args.devices)
-        EventManager.on('ActionDiscovery', save_modified_devices,**pars)
-        EventManager.on('ActionLearnir', save_modified_devices,**pars)
-        EventManager.on('ActionEditraw', save_modified_devices,**pars)
-        EventManager.on('ActionSubscribe', save_modified_devices,**pars)
-        EventManager.on('ActionViewtable1', save_modified_devices,**pars)
-        EventManager.on('ActionInsertKey', save_modified_devices,**pars)
-        EventManager.on('ActionViewtable3', save_modified_devices,**pars)
-        EventManager.on('ActionViewtable4', save_modified_devices,**pars)
-        EventManager.on('ActionStatechange', save_modified_devices,**pars)
-        EventManager.on('ActionStateon', save_modified_devices,**pars)
-        EventManager.on('ActionStateoff', save_modified_devices,**pars)
-        EventManager.on('ActionCreatesh', save_modified_devices,**pars)
-        EventManager.on('ActionDevicedl', handle_device_dl,devices = args.devices,**pars)
-        EventManager.on('ActionExit', terminate_on_finish,actionexec = actionexec,force = True)
+            EventManager.on('ActionDone', terminate_on_finish, actionexec=actionexec)
+        pars = {'save_filename': args.conf, 'save_devices': args.devices, 'debug': args.debug}
+        EventManager.on('TimerAction', do_timer_action, actionexec=actionexec, **pars)
+        EventManager.on('ActionDiscovery', add_discovered_devices, devices=args.devices, mqtt_host=args.mqtt_host, mqtt_port=args.mqtt_port, emit_delay=args.emit_delay)
+        EventManager.on('ExtInsertAction', insert_arrived_action, devices=args.devices, actionexec=actionexec)
+        EventManager.on('ExtChangeState', process_state_change, actionexec=actionexec, devices=args.devices)
+        EventManager.on('ActionDiscovery', save_modified_devices, **pars)
+        EventManager.on('ActionLearnir', save_modified_devices, **pars)
+        EventManager.on('ActionEditraw', save_modified_devices, **pars)
+        EventManager.on('ActionSubscribe', save_modified_devices, **pars)
+        EventManager.on('ActionViewtable1', save_modified_devices, **pars)
+        EventManager.on('ActionInsertKey', save_modified_devices, **pars)
+        EventManager.on('ActionViewtable3', save_modified_devices, **pars)
+        EventManager.on('ActionViewtable4', save_modified_devices, **pars)
+        EventManager.on('ActionStatechange', save_modified_devices, **pars)
+        EventManager.on('ActionStateon', save_modified_devices, **pars)
+        EventManager.on('ActionStateoff', save_modified_devices, **pars)
+        EventManager.on('ActionCreatesh', save_modified_devices, **pars)
+        EventManager.on('ActionDevicedl', handle_device_dl, devices=args.devices, **pars)
+        EventManager.on('ActionExit', terminate_on_finish, actionexec=actionexec, force=True)
         actionexec.configure(args)
         if len(args.mqtt_host):
             actionexec.insert_action(ActionPause("5"))
@@ -404,7 +426,7 @@ USAGE
 
         stopped = False
         numv = 2
-        while threading.active_count()>1 and numv>1:
+        while threading.active_count() > 1 and numv > 1:
             try:
                 time.sleep(1)
                 if stopped:
@@ -412,24 +434,24 @@ USAGE
                     rv = ""
                     numv = 0
                     for th in thl:
-                        if th.name[0:5]!="timer":
-                            numv+=1
-                        rv+= th.name+" "
-                    print("TH=%s" % rv)
+                        if not th.daemon:
+                            numv += 1
+                        rv += th.name + " "
+                    _LOGGER.info("TH=%s" % rv)
                 elif term_called:
                     raise KeyboardInterrupt
             except KeyboardInterrupt:
                 if not stopped:
-                    print("Stopping")
+                    _LOGGER.info("Stopping")
                     stopped = True
                     actionexec.stop()
                     if mqtt_client:
                         mqtt_stop(mqtt_client)
-                    for _,k in args.devices.copy().items():
+                    for _, k in args.devices.copy().items():
                         k.on_stop()
         return 0
     except KeyboardInterrupt:
-        ### handle keyboard interrupt ###
+        # handle keyboard interrupt ###
         return 0
     except Exception as e:
         if DEBUG or TESTRUN:
@@ -439,6 +461,7 @@ USAGE
         sys.stderr.write(program_name + ": " + repr(e) + "\n")
         sys.stderr.write(indent + "  for help use --help")
         return 2
+
 
 if __name__ == "__main__":
     if DEBUG:

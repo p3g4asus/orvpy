@@ -2,7 +2,7 @@ import binascii
 import struct
 
 def pronto2lirc(pronto):
-    codes = [long(binascii.hexlify(pronto[i:i+2]), 16) for i in xrange(0, len(pronto), 2)]
+    codes = [int(binascii.hexlify(pronto[i:i+2]), 16) for i in range(0, len(pronto), 2)]
     #print 'cod = %d %d' % (len(codes),(codes[2] + codes[3]))
 
     if codes[0]:
@@ -11,11 +11,11 @@ def pronto2lirc(pronto):
         raise ValueError('Number of pulse widths does not match the preamble')
 
     frequency = 1 / (codes[1] * 0.241246)
-    print "Freq %f" % frequency
+    print("Freq %f" % frequency)
     return [int(round(code / frequency)) for code in codes[4:]]
 
 def lirc2broadlink(pulses):
-    if isinstance(pulses, basestring):
+    if isinstance(pulses, bytes):
         pulses = [int(i) for i in pulses.split(',')]
     if len(pulses)%2:
         pulses.append(pulses[-1])
@@ -43,8 +43,8 @@ def lirc2broadlink(pulses):
     return packet
 
 def broadlink2lirc(packet):
-    if packet[0]!='\x26':
-        packet = packet.decode('hex')
+    if packet[0]!=b'\x26':
+        packet = binascii.unhexlify(packet)
     arrsz = struct.unpack('<H',packet[2:4])[0]
     lircarr = list()
     i = 4
@@ -59,4 +59,4 @@ def broadlink2lirc(packet):
     return lircarr
 
 def printbroadlink(packet):
-    print str(packet).encode('hex')
+    print(binascii.hexlify(packet))
