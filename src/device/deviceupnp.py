@@ -12,9 +12,9 @@ import requests
 import upnpclient
 from action import ActionEmitir, ActionGetstate
 from device import Device
+from device.devicesamsungctl import DeviceSamsungCtl
 from device.irmanager import IrManager
 from device.mantimermanager import ManTimerManager
-from devicesamsungctl import DeviceSamsungCtl
 from dictionary import DICTIONARY
 from util import b2s, init_logger, upar
 

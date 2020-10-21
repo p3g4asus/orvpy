@@ -55,7 +55,7 @@ class Action(object):
         if device is None or device.__class__.__name__.startswith("Device"):
             self.device = device
         else:
-            raise TypeError('Invalid device argument')
+            raise TypeError(f'Invalid device argument. Class is {device.__class__.__name__} value = {device}')
 
     def to_json(self):
         return {'actionclass': self.__class__.__name__,
@@ -166,11 +166,11 @@ class ActionDiscovery(Action):
             timeout = actionexec.udpmanager.timeout
         if timeout < 0:
             timeout = None
-        from devicect10 import DeviceCT10
-        from deviceprimelan import DevicePrimelan
-        from devicerm import DeviceRM
-        from deviceudp import DeviceUDP
-        from deviceupnp import DeviceUpnp
+        from device.devicect10 import DeviceCT10
+        from device.deviceprimelan import DevicePrimelan
+        from device.devicerm import DeviceRM
+        from device.deviceudp import DeviceUDP
+        from device.deviceupnp import DeviceUpnp
         self.hosts.update(DeviceCT10.discovery(actionexec, timeout))
         self.hosts.update(DeviceRM.discovery(actionexec, timeout))
         php = self.php if len(self.php[0]) else actionexec.prime_hp
@@ -969,7 +969,7 @@ class ActionGetinfo(Action):
                             for k, _ in d.tablever.copy().items():
                                 if k != "1":
                                     kls = class_forname(
-                                        'orvibo.action.ActionViewtable'+k)
+                                        'action.ActionViewtable'+k)
                                     actionexec.insert_action(kls(d), dudpok)
                                     dudpok += 1
                 else:

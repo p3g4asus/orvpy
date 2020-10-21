@@ -1,7 +1,11 @@
+import glob
+import importlib
+import inspect
 import logging
 import sys
 import traceback
 from datetime import datetime
+from os.path import basename, dirname, isfile, join, splitext
 from xml.dom import minidom
 from xml.etree import ElementTree
 from xml.etree.ElementTree import Element, SubElement
@@ -120,16 +124,26 @@ class Device(object):
         xmldoc = minidom.parse(fn)
         items = xmldoc.getElementsByTagName('device')
         dictionary = dictionary_parse(xmldoc)
-        _LOGGER.info("Dictionary has %d items" % len(dictionary))
+        _LOGGER.info(f"Dictionary has {len(dictionary)} items")
         devices = {}
+        modules = glob.glob(join(dirname(__file__), "*.py"))
+        pls = [splitext(basename(f))[0] for f in modules if isfile(f)]
+        classes = dict()
+        for x in pls:
+            if not x.startswith('__'):
+                m = importlib.import_module(f"device.{x}")
+                clsmembers = inspect.getmembers(m, inspect.isclass)
+                classes.update({cla[0]: cla[1] for cla in clsmembers})
         for item in items:
             try:
-                dev = Device.parse(item)
-                if dev is not None:
+                clname = item.attributes['type'].value
+                if clname in classes:
+                    dev = classes[clname](root=item)
                     devices[dev.name] = dev
             except: # noqa: E722
                 _LOGGER.warning(f"{traceback.format_exc()}")
                 pass
+        _LOGGER.info(f"Device number is {len(devices)}")
         return devices
 
     def do_presend_operations(self, action, actionexec):
@@ -180,11 +194,6 @@ class Device(object):
         return self.host+"("+self.__class__.__name__+": "+self.name+");"+self.mac+";"+timeString
         """
         return self.__class__.__name__+"("+self.name+")"
-
-    @staticmethod
-    def parse(root):
-        cls = class_forname("action."+root.attributes['type'].value)
-        return None if cls is None else cls(root=root)
 
     @staticmethod
     def xml_prettify(elem):

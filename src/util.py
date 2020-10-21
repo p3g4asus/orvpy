@@ -140,7 +140,7 @@ def init_logger(name, level=None):
             log['ha'].setLevel(_loglevel)
     # print(f'Init logger {nmref} level {_loglevel}')
     if loggerobj:
-        return logging.getLogger(name) if nmref != name else loggerobj
+        return logging.getLogger(name) if nmref != name else loggerobj['lo']
     _LOGGER = logging.getLogger(nmref)
     _LOGGER.setLevel(_loglevel)
     _LOGGER.propagate = False

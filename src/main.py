@@ -397,6 +397,7 @@ USAGE
             mqtt_client = mqtt_init((args.mqtt_host, args.mqtt_port), args)
 
         _LOGGER.info(str(args))
+        _LOGGER.info(args.devices)
         connect_devices(args.devices)
         actionexec = ActionExecutor()
         if not args.active_on_finish:
