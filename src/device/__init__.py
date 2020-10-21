@@ -8,6 +8,7 @@ from xml.etree.ElementTree import Element, SubElement
 
 import paho.mqtt.client as paho
 from device.mantimermanager import ManTimerManager
+from dictionary import dictionary_parse, dictionary_write
 from util import b2s, bfromhex, class_forname, init_logger, s2b, tohexs
 
 DEVICE_SAVE_FLAG_TABLE = 1
@@ -23,7 +24,6 @@ if sys.version_info >= (3, 0):
 
 class Device(object):
     epoch = datetime.utcfromtimestamp(0)
-    dictionary = dict()
 
     def process_asynch_state_change(self, state):
         pass
@@ -104,36 +104,6 @@ class Device(object):
             client.loop_start()
             self.mqtt_client = client
 
-    @staticmethod
-    def dictionary_write(el):
-        words = SubElement(el, "dictionary")
-
-        for w, lst in Device.dictionary.items():
-            word = SubElement(words, "word", {"name": w})
-            for s in lst:
-                v = SubElement(word, 'v')
-                v.text = s
-
-    @staticmethod
-    def dictionary_parse(root):
-        try:
-            root1 = root.getElementsByTagName("dictionary")[0]
-            d433s = root1.getElementsByTagName("word")
-            for d433 in d433s:
-                try:
-                    nm = d433.attributes['name'].value
-                    irs = d433.getElementsByTagName("v")
-                    terms = list()
-                    Device.dictionary.update({nm: terms})
-                    for ir in irs:
-                        irc = ir.childNodes[0].nodeValue
-                        if len(irc):
-                            terms.append(irc)
-                except: # noqa: E722
-                    _LOGGER.warning(f"{traceback.format_exc()}")
-        except: # noqa: E722
-            _LOGGER.warning(f"{traceback.format_exc()}")
-
     def __eq__(self, other):
         """Override the default Equals behavior"""
         if isinstance(other, Device):
@@ -149,8 +119,8 @@ class Device(object):
     def load(fn):
         xmldoc = minidom.parse(fn)
         items = xmldoc.getElementsByTagName('device')
-        Device.dictionary_parse(xmldoc)
-        _LOGGER.info("Dictionary has %d items" % len(Device.dictionary))
+        dictionary = dictionary_parse(xmldoc)
+        _LOGGER.info("Dictionary has %d items" % len(dictionary))
         devices = {}
         for item in items:
             try:
@@ -187,7 +157,7 @@ class Device(object):
         if flag & DEVICE_SAVE_FLAG_TABLE:
             save_filename += ".tmp.xml"
         root = Element('orvpy')
-        Device.dictionary_write(root)
+        dictionary_write(root)
         devs = SubElement(root, "devices")
         for _, d in save_devices.copy().items():
             if flag & DEVICE_SAVE_FLAG_TABLE:

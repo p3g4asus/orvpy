@@ -8,6 +8,7 @@ from device import Device
 from device.irmanager import IrManager
 from device.mantimermanager import ManTimerManager
 from device.samsung_mappings import samsung_mappings
+from dictionary import DICTIONARY
 from util import init_logger
 
 _LOGGER = init_logger(__name__, level=logging.DEBUG)
@@ -45,8 +46,8 @@ class DeviceSamsungCtl(IrManager, ManTimerManager):
               for k, v in samsung_mappings.items()}
         k = list(dc.keys())
         for s in k:
-            if s in Device.dictionary:
-                irnma = Device.dictionary[s]
+            if s in DICTIONARY:
+                irnma = DICTIONARY[s]
                 for x in irnma:
                     if len(x):
                         dc.update({x: (s, '', dc[s][2])})

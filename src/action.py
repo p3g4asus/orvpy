@@ -12,7 +12,7 @@ import traceback
 from datetime import datetime, timedelta
 
 import event
-from device import Device
+from dictionary import DICTIONARY
 from util import class_forname, init_logger
 
 if sys.version_info >= (3, 0):
@@ -52,7 +52,7 @@ class Action(object):
 
     def __init__(self, device):
         self.randomid = -1
-        if device is None or isinstance(device, Device):
+        if device is None or device.__class__.__name__.startswith("Device"):
             self.device = device
         else:
             raise TypeError('Invalid device argument')
@@ -496,8 +496,8 @@ class ActionEditraw(Action):
                             iratt = src[2]
                             self.device.dir[self.remote][irnm] = (
                                 ircdec, irnm, iratt)
-                            if irnm in Device.dictionary:
-                                irnma = Device.dictionary[irnm]
+                            if irnm in DICTIONARY:
+                                irnma = DICTIONARY[irnm]
                                 for x in irnma:
                                     if len(x):
                                         self.device.dir[self.remote].update(

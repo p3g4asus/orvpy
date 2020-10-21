@@ -10,6 +10,7 @@ from action import (ActionBackup, ActionCreatesh, ActionEmitir,
                     ActionInsertKey, ActionIrask, ActionLearnir,
                     ActionStatechange)
 from device import Device
+from dictionary import DICTIONARY
 from util import b2s, bfromhex, cmp_to_key, init_logger, tohexs
 
 _LOGGER = init_logger(__name__, level=logging.DEBUG)
@@ -214,8 +215,8 @@ class IrManager(Device):
                         if len(nm) and len(irc):
                             ircdec = self.ir_decode(irc)
                             lst[nm].update({irnm: (ircdec, irnm, iratt)})
-                            if irnm in Device.dictionary:
-                                irnma = Device.dictionary[irnm]
+                            if irnm in DICTIONARY:
+                                irnma = DICTIONARY[irnm]
                                 for x in irnma:
                                     if len(x):
                                         lst[nm].update(

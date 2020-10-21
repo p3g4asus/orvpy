@@ -15,6 +15,7 @@ from device import Device
 from device.irmanager import IrManager
 from device.mantimermanager import ManTimerManager
 from devicesamsungctl import DeviceSamsungCtl
+from dictionary import DICTIONARY
 from util import b2s, init_logger, upar
 
 _LOGGER = init_logger(__name__, level=logging.DEBUG)
@@ -416,8 +417,8 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                 dc[s] = (s, s, {"type": DeviceUpnpIR.SOURCE_KEY})
             k = list(dc.keys())
             for s in k:
-                if s in Device.dictionary:
-                    irnma = Device.dictionary[s]
+                if s in DICTIONARY:
+                    irnma = DICTIONARY[s]
                     for x in irnma:
                         if len(x):
                             dc.update({x: (s, '', dc[s][2])})
@@ -622,8 +623,8 @@ class DeviceUpnpIRRC(DeviceUpnpIR):
 
             k = list(dc.keys())
             for s in k:
-                if s in Device.dictionary:
-                    irnma = Device.dictionary[s]
+                if s in DICTIONARY:
+                    irnma = DICTIONARY[s]
                     for x in irnma:
                         if len(x):
                             dc.update({x: (s, '', dc[s][2])})
