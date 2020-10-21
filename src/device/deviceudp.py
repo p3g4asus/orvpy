@@ -564,7 +564,7 @@ class DeviceS20(DeviceUDP):
         return DeviceUDP.do_presend_operations(self, action, actionexec)
 
     def do_postsend_operations(self, action, actionexec):
-        if isinstance(action, ActionStatechange):
+        if isinstance(action, ActionStatechange) and action.newstate != Device.GET_STATE_ACTION:  # quando devo solo ottenere lo stato basta il subscribe che si fa in presend
             actionexec.insert_action(ActionSubscribe(self), 1)
         else:
             DeviceUDP.do_postsend_operations(self, action, actionexec)
