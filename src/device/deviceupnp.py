@@ -294,6 +294,10 @@ class DeviceUpnpIR(DeviceUpnp, IrManager, ManTimerManager):
     def ir_encode(self, irc):
         return irc
 
+    def mqtt_on_message(self, client, userdata, msg):
+        Device.mqtt_on_message(self, client, userdata, msg)
+        IrManager.mqtt_on_message(self, client, userdata, msg)
+
     def get_action_payload(self, action):
         if isinstance(action, ActionGetstate):
             return 'a'
