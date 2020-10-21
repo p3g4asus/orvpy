@@ -13,7 +13,7 @@ from xml.etree.ElementTree import Element, SubElement
 import paho.mqtt.client as paho
 from device.mantimermanager import ManTimerManager
 from dictionary import dictionary_parse, dictionary_write
-from util import b2s, bfromhex, class_forname, init_logger, s2b, tohexs
+from util import b2s, bfromhex, init_logger, s2b, tohexs
 
 DEVICE_SAVE_FLAG_TABLE = 1
 DEVICE_SAVE_FLAG_MAIN = 2
