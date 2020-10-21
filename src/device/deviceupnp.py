@@ -1,4 +1,3 @@
-import json
 import logging
 import re
 import struct
@@ -295,7 +294,7 @@ class DeviceUpnpIR(DeviceUpnp, IrManager, ManTimerManager):
         return irc
 
     def mqtt_on_message(self, client, userdata, msg):
-        Device.mqtt_on_message(self, client, userdata, msg)
+        DeviceUpnp.mqtt_on_message(self, client, userdata, msg)
         IrManager.mqtt_on_message(self, client, userdata, msg)
 
     def get_action_payload(self, action):
