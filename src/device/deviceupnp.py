@@ -1,3 +1,4 @@
+import json
 import logging
 import re
 import struct
@@ -9,8 +10,9 @@ from xml.sax.saxutils import escape
 
 import requests
 
+import event
 import upnpclient
-from action import ActionEmitir, ActionGetstate
+from action import ActionEmitir, ActionGetstate, ActionStatechange
 from device import Device
 from device.devicesamsungctl import DeviceSamsungCtl
 from device.irmanager import IrManager
@@ -22,6 +24,7 @@ _LOGGER = init_logger(__name__, level=logging.DEBUG)
 
 
 class DeviceUpnp(Device):
+    GET_STATE_ACTION = '999'
 
     @staticmethod
     def correct_upnp_name(name):
@@ -61,6 +64,37 @@ class DeviceUpnp(Device):
     def copy_extra_from(self, already_saved_device):
         Device.copy_extra_from(self, already_saved_device)
         self.upnp_location = already_saved_device.upnp_location
+
+    def mqtt_on_message(self, client, userdata, msg):
+        Device.mqtt_on_message(self, client, userdata, msg)
+        sub = self.mqtt_sub(msg.topic)
+        try:
+            if sub == "state":
+                event.EventManager.fire(eventname='ExtInsertAction', hp=(
+                        self.host, self.port), cmdline="", action=ActionStatechange(self, b2s(msg.payload)))
+        except: # noqa: E722
+            _LOGGER.warning(f"{traceback.format_exc()}")
+
+    def mqtt_publish_onfinish(self, action, retval):
+        if isinstance(action, ActionStatechange) and action.newstate == DeviceUpnp.GET_STATE_ACTION:
+            return [dict(topic=self.mqtt_topic("stat", "upnp"), msg=str(retval), options=dict())]
+        else:
+            return Device.mqtt_publish_onfinish(self, action, retval)
+
+    def get_action_payload(self, action):
+        if isinstance(action, ActionStatechange):
+            return 'b'
+        else:
+            return Device.get_action_payload(action)
+
+    def send_action(self, actionexec, action, pay):
+        rv = None
+        if isinstance(action, ActionStatechange) and action.newstate == DeviceUpnp.GET_STATE_ACTION:
+            rv = 1 if self.init_device() else 5
+            action.exec_handler(rv, None)
+        if rv is None or rv != 1:
+            self.destroy_device()
+        return Device.send_action(actionexec, action, pay)
 
     @staticmethod
     def get_name(d):
