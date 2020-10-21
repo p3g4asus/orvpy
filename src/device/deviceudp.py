@@ -8,14 +8,14 @@ from xml.dom import minidom
 from xml.etree.ElementTree import SubElement
 
 import event
-from action import (RV_DATA_WAIT, ActionEmitir, ActionLearnir,
+from action import (DELRECORD_CODE, RV_DATA_WAIT, ActionEmitir, ActionLearnir,
                     ActionNotifystate, ActionSettable, ActionSettable3,
                     ActionSettable4, ActionStatechange, ActionStateoff,
                     ActionStateon, ActionSubscribe, ActionViewtable,
                     ActionViewtable1, ActionViewtable3)
 from device import DEVICE_SAVE_FLAG_MAIN, DEVICE_SAVE_FLAG_TABLE, Device
 from device.irmanager import IrManager
-from device.mantimermanager import DELRECORD_CODE, ManTimerManager
+from device.mantimermanager import ManTimerManager
 from util import b2s, init_logger, s2b, tohexs
 
 _LOGGER = init_logger(__name__, level=logging.DEBUG)
@@ -133,15 +133,6 @@ class DeviceUDP(Device):
         return len(data) >= 6 and data[4:6] == (WRITE_TABLE_ID)
 
     @staticmethod
-    def get_ver_flag(device, table, defv):
-        stable = str(table)
-        if device and isinstance(device, DeviceUDP) and \
-                device.tablever is not None and stable in device.tablever:
-            return str(device.tablever[stable]['flgn'])
-        else:
-            return defv
-
-    @staticmethod
     def ip2string(ip):
         ipp = ip.split('.')
         if len(ipp) == 4:
@@ -155,6 +146,13 @@ class DeviceUDP(Device):
             return ipr
         else:
             return b'\x0A\x00\x00\x01'
+
+    def get_ver_flag(self, table, defv):
+        stable = str(table)
+        if self.tablever is not None and stable in self.tablever:
+            return str(self.tablever[stable]['flgn'])
+        else:
+            return defv
 
     def parse_table1(self, data):
         start = 28
@@ -541,6 +539,9 @@ class DeviceS20(DeviceUDP):
 
     def process_asynch_state_change(self, state):
         self.state = b2s(state)
+
+    def parse_action_timer_args(self, args):
+        return None if args[0] is None else int(args[0])
 
     def mqtt_publish_onfinish(self, action, retval):
         if isinstance(action, (ActionSubscribe, ActionNotifystate)):

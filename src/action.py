@@ -13,14 +13,6 @@ from datetime import datetime, timedelta
 
 import event
 from device import Device
-from device.irmanager import IrManager
-from device.mantimermanager import (ADDRECORD_CODE, DELRECORD_CODE,
-                                    MODRECORD_CODE)
-from devicect10 import DeviceCT10
-from deviceprimelan import DevicePrimelan
-from devicerm import DeviceRM
-from deviceudp import DeviceS20, DeviceUDP
-from deviceupnp import DeviceUpnp
 from util import class_forname, init_logger
 
 if sys.version_info >= (3, 0):
@@ -32,6 +24,9 @@ _LOGGER = init_logger(__name__, level=logging.DEBUG)
 RV_DATA_WAIT = 10523
 RV_NOT_EXECUTED = -1
 RV_ASYNCH_EXEC = -2
+MODRECORD_CODE = 1
+ADDRECORD_CODE = 0
+DELRECORD_CODE = 2
 
 
 '''
@@ -149,13 +144,12 @@ class ActionSubscribe(Action):
 class ActionDiscovery(Action):
 
     def __init__(self, primelanhost='', primelanport=80, primelanpassw='', primelancodu='', primelanport2=0):
-        device = DeviceUDP(hp=("255.255.255.255", 0), mac=b"")
         self.php = (primelanhost, primelanport)
         self.ppasw = primelanpassw
         self.pcodu = primelancodu
         self.pport2 = primelanport2
         self.hosts = {}
-        super(ActionDiscovery, self).__init__(device)
+        super(ActionDiscovery, self).__init__(None)
         self.m_device = False
 
     def to_json(self):
@@ -172,6 +166,11 @@ class ActionDiscovery(Action):
             timeout = actionexec.udpmanager.timeout
         if timeout < 0:
             timeout = None
+        from devicect10 import DeviceCT10
+        from deviceprimelan import DevicePrimelan
+        from devicerm import DeviceRM
+        from deviceudp import DeviceUDP
+        from deviceupnp import DeviceUpnp
         self.hosts.update(DeviceCT10.discovery(actionexec, timeout))
         self.hosts.update(DeviceRM.discovery(actionexec, timeout))
         php = self.php if len(self.php[0]) else actionexec.prime_hp
@@ -207,9 +206,8 @@ class ActionPause(Action):
 
 class ActionDevicedl(Action):
     def __init__(self, device=None):
-        device = DeviceUDP(hp=("255.255.255.255", 0), mac=b"")
         self.hosts = {}
-        super(ActionDevicedl, self).__init__(device)
+        super(ActionDevicedl, self).__init__(None)
 
     def to_json(self):
         rv = Action.to_json(self)
@@ -316,7 +314,8 @@ class ActionBackup(Action):
         self.publish = []
 
     def runint(self, actionexec, returnvalue=RV_NOT_EXECUTED):
-        if isinstance(self.device, IrManager):
+        nextbackup = getattr(self.device, "nextbackup", None)
+        if nextbackup:
             self.publish = self.device.nextbackup(self.topic, self.convert)
             if len(self.publish):
                 return 1
@@ -346,7 +345,8 @@ class ActionInsertKey(Action):
         self.other = other
 
     def runint(self, actionexec, returnvalue=RV_NOT_EXECUTED):
-        if isinstance(self.device, IrManager):
+        dir = getattr(self.device, "dir", None)
+        if dir:
             if self.remote not in self.device.dir:
                 self.device.dir[self.remote] = dict()
             self.device.dir[self.remote].update({self.key: self.a})
@@ -381,7 +381,8 @@ class ActionLearnir(Action):
         return rv
 
     def runint(self, actionexec, returnvalue=RV_NOT_EXECUTED):
-        if isinstance(self.device, IrManager):
+        backupstate = getattr(self.device, "backupstate", None)
+        if backupstate:
             if self.device.backupstate == 0:
                 return super(ActionLearnir, self).runint(actionexec, returnvalue)
             else:
@@ -473,7 +474,8 @@ class ActionEditraw(Action):
                 self.irname = aa[3]
 
     def runint(self, actionexec, returnvalue=RV_NOT_EXECUTED):
-        if isinstance(self.device, IrManager):
+        sh = getattr(self.device, "sh", None)
+        if sh:
             if len(self.newraw):
                 if self.irshname[0] == '@':
                     mo = re.search("[^a-zA-Z0-9_\\-]", self.irname)
@@ -546,7 +548,8 @@ class ActionCreatesh(Action):
         self.shname = shname
 
     def runint(self, actionexec, returnvalue=RV_NOT_EXECUTED):
-        if isinstance(self.device, IrManager):
+        sh = getattr(self.device, "sh", None)
+        if sh:
             if len(self.irname):
                 self.device.sh[self.shname] = self.irname
             else:
@@ -786,15 +789,17 @@ class ActionViewtable1(ActionViewtable):
 class ActionViewtable3(ActionViewtable):
 
     def __init__(self, device):
-        super(ActionViewtable3, self).__init__(
-            device, "3", DeviceUDP.get_ver_flag(device, "3", "2"))
+        get_ver_flag = getattr(device, "get_ver_flag", None)
+        verflag = get_ver_flag("3", "2") if get_ver_flag else "2"
+        super(ActionViewtable3, self).__init__(device, "3", verflag)
 
 
 class ActionViewtable4(ActionViewtable):
 
     def __init__(self, device):
-        super(ActionViewtable4, self).__init__(
-            device, "4", DeviceUDP.get_ver_flag(device, "4", "23"))
+        get_ver_flag = getattr(device, "get_ver_flag", None)
+        verflag = get_ver_flag("4", "23") if get_ver_flag else "23"
+        super(ActionViewtable4, self).__init__(device, "4", verflag)
 
 
 class ActionSettable(Action):
@@ -858,13 +863,7 @@ class ActionSettable3(ActionSettable):
 
         self.rep = 0 if rep is None else int(rep)
         self.timerid = None if timerid is None else int(timerid)
-        if isinstance(device, DeviceS20):
-            if len(args) > 0:
-                self.action = None if args[0] is None else int(args[0])
-            else:
-                self.action = 1
-        else:
-            self.action = ' '.join(args)
+        self.action = device.parse_action_timer_args(args)
 
     def to_json(self):
         rv = Action.to_json(self)
@@ -962,7 +961,8 @@ class ActionGetinfo(Action):
             dtcpok = 0
             for x in range(len(self.devs)):
                 d = self.devs[x][1]
-                if isinstance(d, DeviceUDP):
+                tablever = getattr(d, "tablever", None)
+                if tablever:
                     dudptot += 1
                     if now-d.offt > d.offlimit:
                         if d.tablever:
@@ -992,7 +992,8 @@ class ActionSynctimers(Action):
         super(ActionSynctimers, self).__init__(device)
         self.idx = -1
         try:
-            self.out = DeviceUDP.loadtables(fn, self.device.name)
+            tablever = getattr(device, "tablever", None)
+            self.out = None if not tablever else self.device.loadtables(fn, self.device.name)
         except: # noqa: E722
             _LOGGER.warning(f"{traceback.format_exc()}")
             self.out = None

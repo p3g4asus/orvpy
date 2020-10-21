@@ -5,14 +5,11 @@ from datetime import date, datetime, timedelta
 from xml.etree.ElementTree import SubElement
 
 import event
-from action import ActionSettable3
+from action import (ADDRECORD_CODE, DELRECORD_CODE, MODRECORD_CODE,
+                    ActionSettable3)
 from util import init_logger
 
 _LOGGER = init_logger(__name__, level=logging.DEBUG)
-
-MODRECORD_CODE = 1
-ADDRECORD_CODE = 0
-DELRECORD_CODE = 2
 
 
 class ManTimerManager(object):

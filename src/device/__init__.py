@@ -37,6 +37,9 @@ class Device(object):
     def mqtt_publish_onfinish(self, action, retval):
         return []
 
+    def parse_action_timer_args(self, args):
+        return ' '.join(args)
+
     def mqtt_set_broker(self, hp):
         self.mqtt_stop()
         self.mqtt_start(hp)
