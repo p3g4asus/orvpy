@@ -85,16 +85,15 @@ class DeviceUpnp(Device):
         if isinstance(action, ActionStatechange):
             return 'b'
         else:
-            return Device.get_action_payload(action)
+            return Device.get_action_payload(self, action)
 
     def send_action(self, actionexec, action, pay):
         rv = None
         if isinstance(action, ActionStatechange) and action.newstate == DeviceUpnp.GET_STATE_ACTION:
             rv = 1 if self.init_device() else 5
-            action.exec_handler(rv, None)
         if rv is None or rv != 1:
             self.destroy_device()
-        return Device.send_action(actionexec, action, pay)
+        return action.exec_handler(rv, None) if rv is not None else Device.send_action(self, actionexec, action, pay)
 
     @staticmethod
     def get_name(d):
