@@ -305,10 +305,12 @@ class DeviceUDP(Device):
         if isinstance(action, ActionSubscribe):
             return MAGIC + SUBSCRIBE_LEN + SUBSCRIBE_ID + self.mac \
                 + PADDING_1 + self.mac_reversed + PADDING_1
-        elif isinstance(action, ActionStatechange):
+        elif isinstance(action, ActionStatechange) and action.newstate != Device.GET_STATE_ACTION:
             newst = self.state_value_conv(action.newstate)
             return MAGIC + STATECHANGE_LEN + STATECHANGE_ID + self.mac + PADDING_1\
                 + PADDING_2+(b'\x01' if newst != "0" else b'\x00')
+        elif isinstance(action, ActionStatechange):
+            return b''
         elif isinstance(action, ActionViewtable):
             return MAGIC + VIEW_TABLE_LEN + VIEW_TABLE_ID + self.mac + PADDING_1\
                 + PADDING_2+struct.pack('<B', action.tablenum)+b'\x00' + \

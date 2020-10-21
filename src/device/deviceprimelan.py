@@ -26,7 +26,6 @@ class DevicePrimelan(Device):
     # 0: doppio pulsante
     # 2: On off slider
     # 1: slider 0-100
-    GET_STATE_ACTION = '999'
     TIMEOUT = 7
 
     def process_asynch_state_change(self, state):

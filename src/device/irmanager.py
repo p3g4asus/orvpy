@@ -42,13 +42,13 @@ class IrManager(Device):
                                 action=ActionBackup(self, topic, convert))
 
     def send_action(self, actionexec, action, pay):
-        if isinstance(action, ActionStatechange):
+        if isinstance(action, ActionStatechange) and action.newstate != Device.GET_STATE_ACTION:
             return action.exec_handler(1, None)
         else:
             return Device.send_action(self, actionexec, action, pay)
 
     def do_presend_operations(self, action, actionexec):
-        if isinstance(action, ActionStatechange):
+        if isinstance(action, ActionStatechange) and action.newstate != Device.GET_STATE_ACTION:
             actionexec.insert_action(ActionEmitir(self, action.newstate), 0)
             return 1
         elif isinstance(action, ActionLearnir):

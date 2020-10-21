@@ -28,6 +28,7 @@ if sys.version_info >= (3, 0):
 
 class Device(object):
     epoch = datetime.utcfromtimestamp(0)
+    GET_STATE_ACTION = '-999'
 
     def process_asynch_state_change(self, state):
         pass

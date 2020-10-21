@@ -24,7 +24,6 @@ _LOGGER = init_logger(__name__, level=logging.DEBUG)
 
 
 class DeviceUpnp(Device):
-    GET_STATE_ACTION = '999'
 
     @staticmethod
     def correct_upnp_name(name):
