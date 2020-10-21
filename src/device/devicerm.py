@@ -22,7 +22,7 @@ class DeviceRM(IrManager, ManTimerManager):
             if not self.inner.auth():
                 self.inner = None
         except: # noqa: E722
-            traceback.print_exc()
+            _LOGGER.warning(f"{traceback.format_exc()}")
             self.inner = None
 
     def get_action_payload(self, action):
@@ -103,7 +103,7 @@ class DeviceRM(IrManager, ManTimerManager):
                     else:
                         rv = response[0x22] | (response[0x23] << 8)
             except: # noqa: E722
-                traceback.print_exc()
+                _LOGGER.warning(f"{traceback.format_exc()}")
                 rv = None
             if rv is None or rv != 0:
                 # Forzo futura riconnessione

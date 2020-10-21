@@ -75,7 +75,7 @@ class DeviceSamsungCtl(IrManager, ManTimerManager):
                 if not self.remote.open():
                     self.destroy_device()
             except: # noqa: E722
-                traceback.print_exc()
+                _LOGGER.warning(f"{traceback.format_exc()}")
                 self.destroy_device()
 
         return self.remote
@@ -119,7 +119,7 @@ class DeviceSamsungCtl(IrManager, ManTimerManager):
                     else:
                         rv = 1
             except: # noqa: E722
-                traceback.print_exc()
+                _LOGGER.warning(f"{traceback.format_exc()}")
                 self.destroy_device()
                 rv = None
             return action.exec_handler(rv, None)

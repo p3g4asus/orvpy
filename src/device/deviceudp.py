@@ -150,7 +150,7 @@ class DeviceUDP(Device):
                 try:
                     ipr += struct.pack('<B', int(i))
                 except: # noqa: E722
-                    traceback.print_exc()
+                    _LOGGER.warning(f"{traceback.format_exc()}")
                     ipr += b'\x01'
             return ipr
         else:
@@ -583,7 +583,7 @@ class DeviceS20(DeviceUDP):
                     event.EventManager.fire(eventname='ExtInsertAction', hp=(
                         self.host, self.port), cmdline="", action=ActionStateon(self))
         except: # noqa: E722
-            traceback.print_exc()
+            _LOGGER.warning(f"{traceback.format_exc()}")
 
     def xml_element(self, root, flag=0):
         el = DeviceUDP.xml_element(self, root, flag)

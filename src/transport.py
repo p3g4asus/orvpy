@@ -46,7 +46,7 @@ class TCPServerHandler(SocketServer.BaseRequestHandler):
                 self.request.close()
                 self.request = None
             except: # noqa: E722
-                traceback.print_exc()
+                _LOGGER.warning(f"{traceback.format_exc()}")
 
     def handle(self):
         self.stopped = False
@@ -109,7 +109,7 @@ class TCPServerHandler(SocketServer.BaseRequestHandler):
                     else:
                         wlist = []
             except: # noqa: E722
-                traceback.print_exc()
+                _LOGGER.warning(f"{traceback.format_exc()}")
                 break
         _LOGGER.info(keyv+" DISCONNECTED")
         serv.unsetclientinfo(self.client_address)
@@ -151,7 +151,7 @@ class TCPClient(EthSender):
             sock.close()
             return len(packet)
         except: # noqa: E722
-            traceback.print_exc()
+            _LOGGER.warning(f"{traceback.format_exc()}")
             return -1
 
 
@@ -259,7 +259,7 @@ class HTTPServer(threading.Thread):
                     ("0.0.0.0", self.port), HTTPServerHandler)
                 break
             except: # noqa: E722
-                traceback.print_exc()
+                _LOGGER.warning(f"{traceback.format_exc()}")
                 time.sleep(5)
         if self.server is not None:
             self.server.s = self
@@ -385,7 +385,7 @@ class TCPServer(threading.Thread):
                     ("0.0.0.0", self.port), TCPServerHandler)
                 break
             except: # noqa: E722
-                traceback.print_exc()
+                _LOGGER.warning(f"{traceback.format_exc()}")
                 time.sleep(5)
         if self.server is not None:
             self.server.s = self
@@ -476,7 +476,7 @@ class ListenerTh(threading.Thread, EthSender):
         try:
             return self.socket.sendto(bytearray(packet), addr)
         except: # noqa: E722
-            traceback.print_exc()
+            _LOGGER.warning(f"{traceback.format_exc()}")
             return -1
 
     def __init__(self, port, *args, **kwargs):
@@ -516,10 +516,10 @@ class ListenerTh(threading.Thread, EthSender):
                         self.preparse.parse(addr, data if data[0:1] != b'@' else data+b'\n')['idxout']
                     _LOGGER.info('exitrecv')
                 except: # noqa: E722
-                    traceback.print_exc()
+                    _LOGGER.warning(f"{traceback.format_exc()}")
                     break
         except: # noqa: E722
-            traceback.print_exc()
+            _LOGGER.warning(f"{traceback.format_exc()}")
         self.stopped_ev.set()
 
 
@@ -577,7 +577,7 @@ class UdpManager(object):
                     self.sender.send_packet(hp2, payload)
                     _LOGGER.info(f"S [{hp[0]}:{hp[1]}] -> {tohexs(payload)}")
                 except: # noqa: E722
-                    traceback.print_exc()
+                    _LOGGER.warning(f"{traceback.format_exc()}")
                     return None
             if handler is None:
                 return 5

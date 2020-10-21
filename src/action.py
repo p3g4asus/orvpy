@@ -407,7 +407,7 @@ class ActionLearnir(Action):
                 else:
                     self.idx += 1
             except: # noqa: E722
-                traceback.print_exc()
+                _LOGGER.warning(f"{traceback.format_exc()}")
                 self.idx += 1
         return Action.do_presend_operations(self, actionexec)
 
@@ -656,7 +656,7 @@ class ActionEmitir(Action):
                     self.mqtt_publish_key(dev, nm, 2)
                     self.idx += 1
             except: # noqa: E722
-                traceback.print_exc()
+                _LOGGER.warning(f"{traceback.format_exc()}")
                 self.idx += 1
         return 2
 
@@ -994,7 +994,7 @@ class ActionSynctimers(Action):
         try:
             self.out = DeviceUDP.loadtables(fn, self.device.name)
         except: # noqa: E722
-            traceback.print_exc()
+            _LOGGER.warning(f"{traceback.format_exc()}")
             self.out = None
 
     def do_presend_operations(self, actionexec):

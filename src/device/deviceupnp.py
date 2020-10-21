@@ -48,7 +48,7 @@ class DeviceUpnp(Device):
                 self.upnp_obj = upnpclient.Device(
                     self.upnp_location, self.name)
             except: # noqa: E722
-                traceback.print_exc()
+                _LOGGER.warning(f"{traceback.format_exc()}")
                 self.upnp_obj = None
         return self.upnp_obj
 
@@ -95,7 +95,7 @@ class DeviceUpnp(Device):
                                    location=d.location,
                                    deviceobj=d)
         except: # noqa: E722
-            traceback.print_exc()
+            _LOGGER.warning(f"{traceback.format_exc()}")
         return out
 
 
@@ -340,7 +340,7 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                 else:
                     rv = ''
             except: # noqa: E722
-                traceback.print_exc()
+                _LOGGER.warning(f"{traceback.format_exc()}")
                 rv = ''
             self.current_source = rv
         return self.current_source
@@ -401,7 +401,7 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                     self.get_sources_list()
                     self.fill_ir_list()
                 except: # noqa: E722
-                    traceback.print_exc()
+                    _LOGGER.warning(f"{traceback.format_exc()}")
                     self.destroy_device()
 
         return self.upnp_obj
@@ -448,7 +448,7 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                 webContent = r.content
                 self.channels = DeviceUpnpIRTA2._parse_channel_list(webContent)
             except: # noqa: E722
-                traceback.print_exc()
+                _LOGGER.warning(f"{traceback.format_exc()}")
                 self.channels = {}
 
     def send_action(self, actionexec, action, pay):
@@ -490,7 +490,7 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                         else:
                             rv = 255
             except: # noqa: E722
-                traceback.print_exc()
+                _LOGGER.warning(f"{traceback.format_exc()}")
         elif isinstance(action, ActionGetstate):
             outstate = dict()
             if self.init_device():
@@ -504,7 +504,7 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                     else:
                         rv = 32
                 except: # noqa: E722
-                    traceback.print_exc()
+                    _LOGGER.warning(f"{traceback.format_exc()}")
                     rv = 2
                 vv = self.get_current_source()
                 if len(vv):
@@ -538,7 +538,7 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                         self.sources[DeviceUpnp.correct_upnp_name(
                             src.sname)] = src
             except: # noqa: E722
-                traceback.print_exc()
+                _LOGGER.warning(f"{traceback.format_exc()}")
                 self.sources = None
 
     @staticmethod
@@ -688,7 +688,7 @@ class DeviceUpnpIRRC(DeviceUpnpIR):
                     self.state_init = False
                     self.get_states()
                 except: # noqa: E722
-                    traceback.print_exc()
+                    _LOGGER.warning(f"{traceback.format_exc()}")
                     self.destroy_device()
         if self.upnp_obj and self.a and len(self.dir) == 0 and self.state_init:
             self.fill_ir_list()
@@ -712,7 +712,7 @@ class DeviceUpnpIRRC(DeviceUpnpIR):
             except: # noqa: E722
                 _LOGGER.info("Action Set"+k+" args "+str(self.a['Set'+k].argsdef_in))
                 self.destroy_device()
-                traceback.print_exc()
+                _LOGGER.warning(f"{traceback.format_exc()}")
         return None
 
     def get_states(self, what=None):
@@ -737,7 +737,7 @@ class DeviceUpnpIRRC(DeviceUpnpIR):
                             self.state_init = True
                     _LOGGER.info(self.name+" Upnp State "+k+" = "+str(st))
                 except: # noqa: E722
-                    traceback.print_exc()
+                    _LOGGER.warning(f"{traceback.format_exc()}")
         if rv >= 500:
             return rv-500
         else:

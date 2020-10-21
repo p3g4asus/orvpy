@@ -64,7 +64,7 @@ class SendBufferTimer(object):
                 jsono = json.loads(msg[0:msg.rfind(b'}')+1])
                 return {'msg': jsono, 'convid': b2s(data[10:42])}
         except: # noqa: E722
-            traceback.print_exc()
+            _LOGGER.warning(f"{traceback.format_exc()}")
             pass
         return None
 
@@ -83,7 +83,7 @@ class SendBufferTimer(object):
                     self.set_finished(exitv)
             return rv
         except: # noqa: E722
-            traceback.print_exc()
+            _LOGGER.warning(f"{traceback.format_exc()}")
         return None
 
     def set_finished(self, exitv):
@@ -163,7 +163,7 @@ class SendBufferTimer(object):
                 struct.pack('>i', crc32)+s2b(convid)
             return bytesa+newbytes
         except: # noqa: E722
-            traceback.print_exc()
+            _LOGGER.warning(f"{traceback.format_exc()}")
             return b''
 
 

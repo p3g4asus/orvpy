@@ -47,7 +47,7 @@ class Device(object):
                 self.mqtt_client.loop_stop()
                 self.mqtt_client.disconnect()
             except: # noqa: E722
-                traceback.print_exc()
+                _LOGGER.warning(f"{traceback.format_exc()}")
 
     def mqtt_topic(self, prefix, suffix):
         return str(prefix+'/'+self.__class__.__name__[6:].lower()+"/"+self.name+"/"+suffix)
@@ -127,9 +127,9 @@ class Device(object):
                         if len(irc):
                             terms.append(irc)
                 except: # noqa: E722
-                    traceback.print_exc()
+                    _LOGGER.warning(f"{traceback.format_exc()}")
         except: # noqa: E722
-            traceback.print_exc()
+            _LOGGER.warning(f"{traceback.format_exc()}")
 
     def __eq__(self, other):
         """Override the default Equals behavior"""
@@ -155,7 +155,7 @@ class Device(object):
                 if dev is not None:
                     devices[dev.name] = dev
             except: # noqa: E722
-                traceback.print_exc()
+                _LOGGER.warning(f"{traceback.format_exc()}")
                 pass
         return devices
 
@@ -239,7 +239,7 @@ class Device(object):
             try:
                 self.offlimit = int(root.attributes['offlimit'].value)
             except: # noqa: E722
-                traceback.print_exc()
+                _LOGGER.warning(f"{traceback.format_exc()}")
                 self.offlimit = 60
         self.timers = None
         self.offt = 0

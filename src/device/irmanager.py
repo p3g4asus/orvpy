@@ -102,7 +102,7 @@ class IrManager(Device):
                             self.backuptimer.start()
                             return [attrib]
                         except: # noqa: E722
-                            traceback.print_exc()
+                            _LOGGER.warning(f"{traceback.format_exc()}")
         lst2 = sorted(self.sh, key=cmp_to_key(IrManager.sh_comparer))
         for nm in lst2:
             d433l = self.sh[nm]
@@ -365,4 +365,4 @@ class IrManager(Device):
                     event.EventManager.fire(eventname='ExtInsertAction', hp=(self.host, self.port), cmdline="",
                                             action=action)
         except: # noqa: E722
-            traceback.print_exc()
+            _LOGGER.warning(f"{traceback.format_exc()}")

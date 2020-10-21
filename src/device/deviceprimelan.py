@@ -93,7 +93,7 @@ class DevicePrimelan(Device):
                 event.EventManager.fire(eventname='ExtInsertAction', hp=(
                         self.host, self.port), cmdline="", action=ActionStatechange(self, b2s(msg.payload)))
         except: # noqa: E722
-            traceback.print_exc()
+            _LOGGER.warning(f"{traceback.format_exc()}")
 
     def mqtt_publish_onfinish(self, action, retval):
         if isinstance(action, ActionNotifystate) or\
@@ -183,7 +183,7 @@ class DevicePrimelan(Device):
                 out['{}:{}'.format(*hp)+':'+idv] = dev
             return out
         except: # noqa: E722
-            traceback.print_exc()
+            _LOGGER.warning(f"{traceback.format_exc()}")
             return {}
 
     @staticmethod
@@ -318,7 +318,7 @@ class DevicePrimelan(Device):
                 else:
                     rv = 1
             except: # noqa: E722
-                traceback.print_exc()
+                _LOGGER.warning(f"{traceback.format_exc()}")
                 rv = None
             return action.exec_handler(rv, self.state)
         elif isinstance(action, ActionStatechange):
@@ -332,7 +332,7 @@ class DevicePrimelan(Device):
                         self.state = rv
                     rv = 1
             except: # noqa: E722
-                traceback.print_exc()
+                _LOGGER.warning(f"{traceback.format_exc()}")
                 rv = None
             return action.exec_handler(rv, self.state)
         else:

@@ -1,3 +1,4 @@
+import logging
 import threading
 import traceback
 from datetime import date, datetime, timedelta
@@ -5,6 +6,9 @@ from xml.etree.ElementTree import SubElement
 
 import event
 from action import ActionSettable3
+from util import init_logger
+
+_LOGGER = init_logger(__name__, level=logging.DEBUG)
 
 MODRECORD_CODE = 1
 ADDRECORD_CODE = 0
@@ -207,5 +211,5 @@ class ManTimerManager(object):
                 if t['year'] is not None:
                     out.append(t)
             except: # noqa: E722
-                traceback.print_exc()
+                _LOGGER.warning(f"{traceback.format_exc()}")
         return out

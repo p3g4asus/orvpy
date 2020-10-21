@@ -17,7 +17,7 @@ class DeviceVirtual(Device):
             try:
                 lst.append(d433.childNodes[0].nodeValue)
             except: # noqa: E722
-                traceback.print_exc()
+                _LOGGER.warning(f"{traceback.format_exc()}")
                 pass
 
     def get_last_target_from_state(self):
@@ -86,9 +86,9 @@ class DeviceVirtual(Device):
                             "d": dev,
                             "s": stateact})
                     except: # noqa: E722
-                        traceback.print_exc()
+                        _LOGGER.warning(f"{traceback.format_exc()}")
             except: # noqa: E722
-                traceback.print_exc()
+                _LOGGER.warning(f"{traceback.format_exc()}")
                 pass
 
     def states_xml_device_node_write(self, el, lst, nicks):

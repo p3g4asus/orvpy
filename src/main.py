@@ -30,12 +30,14 @@ import traceback
 from signal import SIGTERM, signal
 
 import paho.mqtt.client as paho
-from action import (ActionDiscovery, ActionEmitir, ActionExecutor,
-                    ActionNotifystate, ActionPause, ActionStatechange,
-                    ActionSubscribe, ActionViewtable, ActionViewtable1,
-                    ActionViewtable4, Device, DeviceS20, IrManager)
-from device import DEVICE_SAVE_FLAG_MAIN, DEVICE_SAVE_FLAG_TABLE
+from action import (ActionDiscovery, ActionEmitir, ActionNotifystate,
+                    ActionPause, ActionStatechange, ActionSubscribe,
+                    ActionViewtable, ActionViewtable1, ActionViewtable4)
+from device import DEVICE_SAVE_FLAG_MAIN, DEVICE_SAVE_FLAG_TABLE, Device
+from device.deviceudp import DeviceS20
+from device.irmanager import IrManager
 from event import EventManager
+from executor import ActionExecutor
 from util import class_forname, init_logger
 
 __all__ = []
@@ -128,7 +130,7 @@ class ActionConf(ap.Action):
                 devices = Device.load(values)
                 setattr(namespace, 'devices', devices)
             except: # noqa: E722
-                traceback.print_exc()
+                _LOGGER.warning(f"{traceback.format_exc()}")
                 raise ap.ArgumentError(values+' is not a valid conf file')
         else:
             setattr(namespace, 'devices', {})
@@ -161,7 +163,7 @@ class ActionAction(ap.Action):
                     '''_LOGGER.info('tuple '+str(t)+" val "+str(values))'''
                     return cls(*t)
                 except: # noqa: E722
-                    traceback.print_exc()
+                    _LOGGER.warning(f"{traceback.format_exc()}")
         return None
 
     def __call__(self, parser, namespace, values, option_string=None):
@@ -456,7 +458,7 @@ USAGE
     except Exception as e:
         if DEBUG or TESTRUN:
             raise(e)
-        traceback.print_exc()
+        _LOGGER.warning(f"{traceback.format_exc()}")
         indent = len(program_name) * " "
         sys.stderr.write(program_name + ": " + repr(e) + "\n")
         sys.stderr.write(indent + "  for help use --help")

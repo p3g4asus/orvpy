@@ -58,7 +58,7 @@ def gendevice(devtype, host, mac, timeout):
     return device_class(host=host, mac=mac, devtype=devtype, timeout=timeout)
 
 
-def discover(timeout=None, local_ip_address=None, timeout2 = 10):
+def discover(timeout=None, local_ip_address=None, timeout2=10):
     if local_ip_address is None or local_ip_address.startswith('127.'):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(('8.8.8.8', 53))  # connecting to a UDP address doesn't send packets
