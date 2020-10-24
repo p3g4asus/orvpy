@@ -64,7 +64,7 @@ class DevicePrimelan(Device):
             return s
 
     def do_presend_operations(self, action, actionexec):
-        if isinstance(action, ActionStatechange) and action.newstate != DevicePrimelan.GET_STATE_ACTION:
+        if isinstance(action, ActionStatechange) and action.newstate != DevicePrimelan.GET_STATE_ACTION and time.time() - self.last_get > 10:
             actionexec.insert_action(ActionStatechange(self, DevicePrimelan.GET_STATE_ACTION), 0)
             return 0
         else:
