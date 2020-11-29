@@ -561,7 +561,7 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
             else DeviceUpnpIR.send_action(self, actionexec, action, pay)
 
     def get_sources_list(self):
-        if not len(self.sources):
+        if not self.sources:
             try:
                 res = self.a["GetSourceList"]()
                 xmldoc = minidom.parseString(res['SourceList'])
