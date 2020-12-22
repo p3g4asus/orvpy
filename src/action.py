@@ -382,7 +382,7 @@ class ActionLearnir(Action):
 
     def runint(self, actionexec, returnvalue=RV_NOT_EXECUTED):
         backupstate = getattr(self.device, "backupstate", None)
-        if backupstate:
+        if backupstate is not None:
             if self.device.backupstate == 0:
                 return super(ActionLearnir, self).runint(actionexec, returnvalue)
             else:

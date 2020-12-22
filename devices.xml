@@ -85,10 +85,10 @@
     </word>
   </dictionary>
   <devices>
-    <device host="192.168.25.51" id="65" mac="c380c2a819330041" mytime="1577341271084" name="balcone" nick="balcone" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="2" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
-    <device host="192.168.25.51" id="30" mac="c380c2a81933001e" mytime="1577341271084" name="discesa_camera" nick="discesa camera" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="0" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
-    <device host="192.168.25.51" id="26" mac="c380c2a81933001a" mytime="1577341271084" name="salita_cabina" nick="salita cabina" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="0" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
-    <device host="192.168.25.210" mac="3139322e3136382e32352e3231303a34393135343a52656e646572696e67436f6e74726f6c" mytime="1577341271085" name="dev_3139322e3136382e32352e3231303a34393135343a52656e646572696e67436f6e74726f6c" offlimit="60" port="49154" type="DeviceUpnpIRRC" upnp_location="http://192.168.25.210:49154/MediaRenderer/desc.xml">
+    <device host="192.168.25.51" id="65" mac="c380c2a819330041" mytime="1608635525415" name="balcone" nick="balcone" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="2" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
+    <device host="192.168.25.51" id="30" mac="c380c2a81933001e" mytime="1608635525415" name="discesa_camera" nick="discesa camera" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="0" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
+    <device host="192.168.25.51" id="26" mac="c380c2a81933001a" mytime="1608635525415" name="salita_cabina" nick="salita cabina" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="0" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
+    <device host="192.168.25.210" mac="3139322e3136382e32352e3231303a34393135343a52656e646572696e67436f6e74726f6c" mytime="1608635525416" name="dev_3139322e3136382e32352e3231303a34393135343a52656e646572696e67436f6e74726f6c" offlimit="60" port="49154" type="DeviceUpnpIRRC" upnp_location="http://192.168.25.210:49154/MediaRenderer/desc.xml">
       <d433s/>
       <dirs>
         <dir name="dev_3139322e3136382e32352e3231303a34393135343a52656e646572696e67436f6e74726f6c">
@@ -121,17 +121,17 @@
       <timers/>
       <states/>
     </device>
-    <device host="192.168.25.51" id="69" mac="c380c2a819330045" mytime="1577341271086" name="presa_comandata" nick="presa comandata" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="2" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
-    <device host="192.168.25.51" id="2" mac="c380c2a819330002" mytime="1577341271087" name="sblocc_ascensore" nick="sblocc ascensore" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="0" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
-    <device host="192.168.25.50" mac="3139322e3136382e32352e35303a313836393a52656e646572696e67436f6e74726f6c" mytime="1577341271087" name="dev_3139322e3136382e32352e35303a313836393a52656e646572696e67436f6e74726f6c" offlimit="60" port="1869" type="DeviceUpnpIRRC" upnp_location="http://192.168.25.50:1869/">
+    <device host="192.168.25.51" id="69" mac="c380c2a819330045" mytime="1608635525417" name="presa_comandata" nick="presa comandata" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="2" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
+    <device host="192.168.25.51" id="2" mac="c380c2a819330002" mytime="1608635525417" name="sblocc_ascensore" nick="sblocc ascensore" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="0" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
+    <device host="192.168.25.50" mac="3139322e3136382e32352e35303a313836393a52656e646572696e67436f6e74726f6c" mytime="1608635525417" name="dev_3139322e3136382e32352e35303a313836393a52656e646572696e67436f6e74726f6c" offlimit="60" port="1869" type="DeviceUpnpIRRC" upnp_location="http://192.168.25.50:1869/">
       <d433s/>
       <dirs/>
       <shs/>
       <timers/>
       <states/>
     </device>
-    <device host="192.168.25.51" id="58" mac="c380c2a81933003a" mytime="1577341271089" name="tendacentraiesai" nick="tendacentraiesai" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="2" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
-    <device emit_delay="1.0" host="192.168.25.45" mac="214018770f78" mytime="1577341271090" name="blackbeam2" offlimit="60" port="80" type="DeviceRM">
+    <device host="192.168.25.51" id="58" mac="c380c2a81933003a" mytime="1608635525418" name="tendacentraiesai" nick="tendacentraiesai" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="2" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
+    <device emit_delay="1.0" host="192.168.25.45" mac="214018770f78" mytime="1608635525418" name="blackbeam2" offlimit="60" port="80" type="DeviceRM">
       <d433s/>
       <dirs>
         <dir name="lg">
@@ -233,9 +233,9 @@
       </shs>
       <timers/>
     </device>
-    <device host="192.168.25.51" id="35" mac="c380c2a819330023" mytime="1577341271097" name="discesa_bagno" nick="discesa bagno" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="0" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
-    <device host="192.168.25.51" id="36" mac="c380c2a819330024" mytime="1577341271098" name="salita_bagno" nick="salita bagno" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="0" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
-    <device emit_delay="1.0" host="192.168.25.44" mac="9d994234ea34" mytime="1577341271098" name="blackbeam1" offlimit="5" port="80" type="DeviceRM">
+    <device host="192.168.25.51" id="35" mac="c380c2a819330023" mytime="1608635525425" name="discesa_bagno" nick="discesa bagno" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="0" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
+    <device host="192.168.25.51" id="36" mac="c380c2a819330024" mytime="1608635525425" name="salita_bagno" nick="salita bagno" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="0" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
+    <device emit_delay="1.0" host="192.168.25.44" mac="9d994234ea34" mytime="1608635525425" name="blackbeam1" offlimit="5" port="80" type="DeviceRM">
       <d433s/>
       <dirs>
         <dir name="pioneer">
@@ -294,7 +294,7 @@
           <ir freq="38000" name="volume30-">260f8c009495123812381238121312131213121312121337133713371213121312131213121312381238121312371312131213121312131212131238121312381238123812371300060795951238123713371312131213121312121312381238123812131213121312131213123713371312133713121213121312131213121312381213123812371337133713000d05000000000000000000000000</ir>
           <ir freq="38000" name="yellow">26008a009495113912381238121312131213121312131238123812381213121312131213121312381213123812131238121312131213121312381213123812131238123812381200060794961238123812381213111411131113121312381238123812131213121312131213123812131238121312381213121312131213123812131238121312381238123812120d05000000000000000000000000</ir>
         </dir>
-        <dir name="sky">
+        <dir name="skyhd">
           <ir freq="38000" name="0">26007600082008250818085b0829082a0825081c080001a80820085608180818081708170818081808000a72082108250817085b082908290825081c080001a808210832083b0818081708170818081708000a72082008250818085b082908290825081c080001a808200832083b0818081808180817081808080d05</ir>
           <ir freq="38000" name="1">26007600082008250817085b082908290825081c080001a808210852081808180818081c0718071808000a73082008250818085b082908290825081c080001a80820082e083b08170817081c0817081708000a72082108250817085b082908290825081c080001a80820082e083b08170818081c0818081808080d05</ir>
           <ir freq="38000" name="2">26007600082108250817085b082908290825081c080001a80821084d08170818081807210818081707000a73082008250817085b0829082a0825081c080001a808210829083b0817081708200818081807000a73082008250818085b082908290825081c080001a808200829083b0818081808210818081708080d05</ir>
@@ -333,10 +333,48 @@
           <ir freq="38000" name="up">26004e00072107260718075c072a072a0726071d070001a80721074a071807180721071d0719071807000a73072107260718075c072a072a0726071d070001a906210726073c07180721071d0718071808080d050000000000000000</ir>
           <ir freq="38000" name="yellow">26007600082008250818085b082908290825081c080001a80821083b08180818082a08210818081708000a72082108250817085a082a08290825081c080001a808210818083b0818082908210817081808000a72082008250818085b082908290825081c080001a808210818083b0818082a08210718071808080d05</ir>
         </dir>
+        <dir name="sky">
+          <ir freq="38000" name="0">26004000581d0f0e0f0e0f1d0f1d1d0e0f0f0f0e0f0e0f0e0f0e0f0f0f0e1d1d0f0e0f0f0e0f0f0e0f0e1e1d1d1d0f0e0f0e0f0f0e0f0f0e0f0e0f0e0f0f0e0f0f000d050000000000000000</ir>
+          <ir freq="38000" name="1">26003e00571d0f0f0e0f0f1d0e1d1e0e0f0e0f0f0e0f0f0e0f0e0f0e0f0f1d1d0f0e0f0e0f0f0e0f0f0e1d1d1e1d0e0f0f0e0f0e0f0e0f0f0e0f0f0e0f0e1e000d0500000000000000000000</ir>
+          <ir freq="38000" name="2">26003e00571d0f0f0e0f0f1d0e1d1e0e0f0e0f0f0e0f0f0e0f0e0f0e0f0f1d1d0f0e0f0e0f0f0e0f0f0e1d1d1e1d0f0e0f0e0f0e0f0f0e0f0f0e0f0e1d1d10000d0500000000000000000000</ir>
+          <ir freq="38000" name="3">26003e00581d0f0e0f0e0f1d0f1d1d0f0e0f0f0e0f0e0f0e0f0e0f0f0f0e1d1d0f0e0f0f0e0f0f0e0f0e1e1d1d1d0f0e0f0e0f0f0e0f0f0e0f0e0f0e1e0e0f000d0500000000000000000000</ir>
+          <ir freq="38000" name="4">26003e00571d0f0f0e0f0f1d0e1d1e0e0f0e0f0f0e0f0f0e0f0e0f0e0f0f1d1d0f0e0f0e0f0e0f0f0f0e1d1d1e1d0f0e0f0e0f0e0f0f0e0f0f0e1d1d0f0e10000d0500000000000000000000</ir>
+          <ir freq="38000" name="5">26003c00581c0f0f0f0e0f1d0f1c1e0e0f0f0e0f0f0e0f0e0f0e0f0f0e0f1d1d0f0e0f0e0f0f0f0e0f0e1d1d1e1d0f0e0f0e0f0e0f0f0e0f0f0e1d1d1e000d05000000000000000000000000</ir>
+          <ir freq="38000" name="6">26003e00581d0f0e0f0e0f1d0f1d1d0f0f0e0f0e0f0e0f0f0e0f0f0e0f0e1e1d0e0f0f0e0f0e0f0e0f0f1d1d1d1d0f0f0e0f0f0e0f0e0f0e0f0f1d0e0f1d0f000d0500000000000000000000</ir>
+          <ir freq="38000" name="7">26003e00581d0f0e0f0f0e1d0f1d1e0e0f0e0f0e0f0e0f0f0f0e0f0e0f0e1e1d0e0f0f0e0f0e0f0e0f0f1d1d1d1d0f0f0e0f0f0e0f0e0f0e0f0f1d0e0f0f0f000d0500000000000000000000</ir>
+          <ir freq="38000" name="8">26003e00581c0f0f0f0e0f1d0f1c1e0e0f0e0f0f0f0e0f0e0f0e0f0e0f0f1d1d0f0e0f0e0f0f0e0f0f0e1d1d1e1d0f0e0f0e0f0e0f0f0e0f1d1d0f0e0f0f0f000d0500000000000000000000</ir>
+          <ir freq="38000" name="9">26003c00581d0f0f0e0f0f1c0f1d1e0e0f0e0f0e0f0f0f0e0f0e0f0e0f0e1e1d0f0e0f0e0f0e0f0f0e0f1d1d1e1d0e0f0f0e0f0e0f0e0f0f1d1d0f0e1e000d05000000000000000000000000</ir>
+          <ir freq="38000" name="av">26008c009493123713371237121213121212121212121337123712371312121212121212131212371212131113121212121212121312121212371337123712371337123712371300061594941237123713371212121213121212121212371337123712121312121212121212133712121212121213121212121212121312123712371337123712371337123712000d05000000000000000000000000</ir>
+          <ir freq="38000" name="back">26003a00581d0f0e0f0f0e1d0f1d1d0f0f0e0f0e0f0e0f0f0e0f0f0e0f0e1e1d0e0f0f0e0f0e0f0e0f0f1d1d1d1d0f0f1d0e0f0f0e0f0f1c1e1d1e000d050000000000000000000000000000</ir>
+          <ir freq="38000" name="blue">26003e00581d0f0e0f0e0f1d0f1d1d0f0e0f0f0e0f0e0f0e0f0e0f0f0e0f1d1d0f0e0f0f0e0f0f0e0f0e1e1d1d1d0f0e0f0e1e0e0f0e101c0f0e0f0f0e0f0f000d0500000000000000000000</ir>
+          <ir freq="38000" name="down">26003a00581d0f0f0e0f0f1c0f1d1e0e0f0e0f0e0f0f0f0e0f0e0f0e0f0e1e1d0f0e0f0e0f0e0f0f0f0e1d1d1e1d0e0f0f0e1d1d1e0e0f1d0f0e1e000d050000000000000000000000000000</ir>
+          <ir freq="38000" name="exit">26003c00581d0f0e0f0f0e1d0f1d1e0e0f0e0f0e0f0f0e0f0f0e0f0e0f0e1e1d0f0e0f0e0f0e0f0f0e0f1d1d1e1c0f0f1d1d0f0e0f0e0f0f0f0e1d0f0f000d05000000000000000000000000</ir>
+          <ir freq="38000" name="ffw">26003c00581d0f0e0f0e0f1d0f1d1d0f0f0e0f0e0f0e0f0f0e0f0f0e0f0e1e1d0e0f0f0e0f0e0f0e0f0f1d1d1d1d0f0f0e0f0f0e1d1d1e1d0f0e0f0e0f000d05000000000000000000000000</ir>
+          <ir freq="38000" name="green">26003c00581d0f0e0f0f0f1c0f1d1e0e0f0e0f0e0f0f0e0f0f0e0f0e0f0e1e1d0f0e0f0e0f0e0f0f0e0f1d1d1e1c0f0f0f0e1d0f0f1c1e0e0f0e0f1d0f000d05000000000000000000000000</ir>
+          <ir freq="38000" name="info">26003a00581d0f0e0f0e0f1d0f1d1d0f0e0f0f0e0f0e0f0e0f0f0e0f0f0e1d1d0f0f0e0f0f0e0f0e0f0e1e1d1d1d0f0e1e0e0f1d0f0e1e1c1e0e0f000d050000000000000000000000000000</ir>
+          <ir freq="38000" name="left">26003a00581d0f0e0f0e0f1d0f1d1d0f0f0e0f0e0f0e0f0f0e0f0f0e0f0e1e1c0f0f0f0e0f0e0f0e0f0e1e1d1d1d0f0e0f0f1d1d1d0f0f1d1d1d0f000d050000000000000000000000000000</ir>
+          <ir freq="38000" name="menu">26003c00581d0f0e0f0f0e1d0f1d1e0e0f0e0f0e0f0f0e0f0f0e0f0e0f0e1e1d0f0e0f0e0f0e0f0f0e0f1d0f0e1d1e1d1d0e0f1d0f0e1e0e0f1d0f0e0f000d05000000000000000000000000</ir>
+          <ir freq="38000" name="mute">26008c009493133712371336131212121212131212121237133613371212131113121212121212371337123713361312121212121312121212121212131212371237133613371200061694931337123712371312121212121212131212371237133712121212121213121212123713371237123713121212121212121312121212121212133613371237133712000d05000000000000000000000000</ir>
+          <ir freq="38000" name="ok">26003c00581d0f0e0f0e0f1d0f1d1d0f0e0f0e0f0f0e0f0e0f0f0e0f0e0f1d1d0f0f0e0f0e0f0f0e0f0e1e1d1d1d0f0e0f0e1e1d1d0f0e0f0f1d0e0f0f000d05000000000000000000000000</ir>
+          <ir freq="38000" name="play">26003e00581d0f0e0f0f0e1d0f1d1d0f0f0e0f0e0f0e0f0f0e0f0f0e0f0e1e1d0e0f0f0e0f0e0f0e0f0f1c1e1d1d0f0f0f0e0f0e1d0f0f0e0f0e0f0e0f1d0f000d0500000000000000000000</ir>
+          <ir freq="38000" name="power">26003e00571e0e0f0e100d1e0e1e1c100e0f0e0f0e0f0f0f0d100e0f0e0f1d1e0d100e0f0e0f0e0f0e101d0e0e1e1d1e0d100e0f0e0f0e0f1d0f0e1e0e0f0f000d0500000000000000000000</ir>
+          <ir freq="38000" name="programma+">26003e00581d0f0e0f0f0e1d0f1d1d0f0f0e0f0e0f0e0f0f0e0f0f0e0f0e1e1d0e0f0f0e0f0e0f0e0f0f1d1d1d1d0f0f0e0f0f0e1d1d0f0f0e0f0f0e0f0e0f000d0500000000000000000000</ir>
+          <ir freq="38000" name="programma-">26003c00581d0f0e0f0e0f1d0f1d1d0f0f0e0f0e0f0e0f0e0f0f0f0e0f0e1e1c0f0f0f0e0f0e0f0e0f0e1e1d1d1d0f0e0f0f0e0f1d1d0f0e0f0f0e0f1d000d05000000000000000000000000</ir>
+          <ir freq="38000" name="rec">26003e00581d0f0e0f0e0f1d0f1d1d0f0e0f0f0e0f0e0f0e0f0f0e0f0f0e1d1d0f0f0e0f0f0e0f0e0f0e1e1d1d1d0f0e0f0e1e1d0f0e0f0e0f0e0f0f0f0e0f000d0500000000000000000000</ir>
+          <ir freq="38000" name="red">26003a00581c0f0f0f0e0f1d0f1c1e0e0f0e0f0f0e0f0f0e0f0e0f0e0f0f1d1d0f0e0f0e0f0f0e0f0f0e1d1d1e1d0f0e0f0e1e0e0f1d1d0f0e1d1e000d050000000000000000000000000000</ir>
+          <ir freq="38000" name="revw">26003c00581d0f0f0e0f0e1d0f1d1e0e0f0e0f0e0f0f0e0f0f0e0f0e0f0e1e1d0f0e0f0e0f0e0f0f0e0f1d1d1e1c0f0f0f0e0f0e1d0f0f0e0f0e0f1d1e000d05000000000000000000000000</ir>
+          <ir freq="38000" name="right">26003a00581d0f0e0f0e0f1d0f1d1d0f0f0e0f0e0f0e0f0f0e0f0f0e0f0e1e1c0f0f0f0e0f0e0f0e0f0e1e1d1d1d0f0e0f0f1d1d1d0f0f1d1d0e0f000d050000000000000000000000000000</ir>
+          <ir freq="38000" name="sky">26003e00581d0f0e0f0e0f1d0f1d1d0f0e0f0f0e0f0e0f0f0e0f0e0f0f0e1d1d0f0f0e0f0f0e0f0e0f0e1e0e0f1d1d1d1e1d0f0e0f0e0f0e0f0e0f0f0f0e0f000d0500000000000000000000</ir>
+          <ir freq="38000" name="smart">26003c00581d0e0f0f0e0f1d0f1d1d0e0f0f0e0f0f0e0f0e0f0e0f0f0e0f1d1d0f0e0f0f0e0f0f0e0f0e1e1d1d1d0f0e1e1c0f0f0f0e0f0e0f0e0f0e1e000d05000000000000000000000000</ir>
+          <ir freq="38000" name="tools">26003e00571d0f0f0e0f0f1d0e1d1e0e0f0e0f0f0e0f0f0e0f0e0f0e0f0f1d1d0f0e0f0e0f0f0e0f0f0e1d1d1e1d0f0e0f0e1d0f0f0e0f0e0f0e0f0f0e1d10000d0500000000000000000000</ir>
+          <ir freq="38000" name="up">26003c00581d0e0f0f0e0f1d0f1d1d0e0f0f0e0f0f0e0f0e0f0e0f0f0e0f1d1d0f0e0f0f0e0f0f0e0f0e1e1c1e1d0f0e0f0e1e1d1d0e0f1d0f0e0f0f0f000d05000000000000000000000000</ir>
+          <ir freq="38000" name="yellow">26003c00581d0f0e0f0e0f1d0f1d1d0f0f0e0f0e0f0e0f0f0e0f0f0e0f0e1e1d0e0f0f0e0f0e0f0e0f0f1d1d1d1d0f0f0e0f1d0f0e1d1e0e0f0e0f0e10000d05000000000000000000000000</ir>
+        </dir>
       </dirs>
       <shs>
         <sh name="2sky">
           <ir>samsung:av</ir>
+          <ir>samsung:right</ir>
           <ir>samsung:right</ir>
           <ir>sky:sky</ir>
         </sh>
@@ -674,7 +712,7 @@
       </shs>
       <timers/>
     </device>
-    <device conffile="$MAINPTH/sottosamctl.conf" host="192.168.25.53" mac="aabbccddee0011223344" mytime="1577341271121" name="sottosamctl" offlimit="60" port="8080" type="DeviceSamsungCtl">
+    <device conffile="$MAINPTH/sottosamctl.conf" host="192.168.25.53" mac="aabbccddee0011223344" mytime="1608635525447" name="sottosamctl" offlimit="60" port="8080" type="DeviceSamsungCtl">
       <d433s/>
       <dirs>
         <dir name="sottosamctl">
@@ -722,9 +760,9 @@
       <shs/>
       <timers/>
     </device>
-    <device host="192.168.25.51" id="56" mac="c380c2a819330038" mytime="1577341271126" name="lampadari" nick="lampadari" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="2" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
-    <device host="192.168.25.51" id="63" mac="c380c2a81933003f" mytime="1577341271126" name="tende_iateraii_s" nick="tende iateraii s" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="2" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
-    <device host="127.0.0.1" mac="96f2e2e44500" mytime="1577341271127" name="tenda" offlimit="0" port="3001" type="DeviceVirtual">
+    <device host="192.168.25.51" id="56" mac="c380c2a819330038" mytime="1608635525449" name="lampadari" nick="lampadari" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="2" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
+    <device host="192.168.25.51" id="63" mac="c380c2a81933003f" mytime="1608635525449" name="tende_iateraii_s" nick="tende iateraii s" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="2" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
+    <device host="127.0.0.1" mac="96f2e2e44500" mytime="1608635525449" name="tenda" offlimit="0" port="3001" type="DeviceVirtual">
       <targets>
         <target>tende_iateraii_s</target>
         <target>tende_iaterai_d</target>
@@ -773,10 +811,10 @@
         </state>
       </states>
     </device>
-    <device host="192.168.25.42" mac="accf2393349c" mytime="1577341271127" name="s201" offlimit="60" port="8914" rtime="60" sec1900="3786333670896" sst="0" state="0" stime="7" type="DeviceS20"/>
-    <device host="192.168.25.51" id="55" mac="c380c2a819330037" mytime="1577341271128" name="penisola" nick="penisola" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="1" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
-    <device host="192.168.25.51" id="64" mac="c380c2a819330040" mytime="1577341271128" name="disimpegno_notte" nick="disimpegno notte" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="2" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
-    <device host="192.168.25.41" mac="accf23725a50" mytime="1577341271128" name="orvibo1" offlimit="60" port="8913" rtime="60" sec1900="7196897" sst="0" stime="7" type="DeviceAllOne">
+    <device host="192.168.25.42" mac="accf2393349c" mytime="1608635525450" name="s201" offlimit="60" port="8914" rtime="60" sec1900="3786333670896" sst="0" state="" stime="7" type="DeviceS20"/>
+    <device host="192.168.25.51" id="55" mac="c380c2a819330037" mytime="1608635525450" name="penisola" nick="penisola" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="1" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
+    <device host="192.168.25.51" id="64" mac="c380c2a819330040" mytime="1608635525450" name="disimpegno_notte" nick="disimpegno notte" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="2" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
+    <device host="192.168.25.41" mac="accf23725a50" mytime="1608635525451" name="orvibo1" offlimit="60" port="8913" rtime="60" sec1900="7206570" sst="0" stime="7" type="DeviceAllOne">
       <d433s/>
       <dirs>
         <dir name="general">
@@ -3549,8 +3587,8 @@
       </shs>
       <timers/>
     </device>
-    <device host="192.168.25.51" id="68" mac="c380c2a819330044" mytime="1577341271205" name="cucina" nick="cucina" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="1" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
-    <device host="192.168.25.53" mac="3139322e3136382e32352e35333a373637363a52656e646572696e67436f6e74726f6c" mytime="1577341271205" name="sottotvrceth" offlimit="60" port="7676" type="DeviceUpnpIRRC" upnp_location="http://192.168.25.53:7676/smp_15_">
+    <device host="192.168.25.51" id="68" mac="c380c2a819330044" mytime="1608635525512" name="cucina" nick="cucina" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="1" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
+    <device host="192.168.25.53" mac="3139322e3136382e32352e35333a373637363a52656e646572696e67436f6e74726f6c" mytime="1608635525513" name="sottotvrceth" offlimit="60" port="7676" type="DeviceUpnpIRRC" upnp_location="http://192.168.25.53:7676/smp_15_">
       <d433s/>
       <dirs>
         <dir name="dev_3139322e3136382e32352e35333a373637363a52656e646572696e67436f6e74726f6c">
@@ -3649,9 +3687,9 @@
       <timers/>
       <states/>
     </device>
-    <device host="192.168.25.51" id="31" mac="c380c2a81933001f" mytime="1577341271209" name="salita_camera" nick="salita camera" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="0" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
-    <device host="192.168.25.51" id="59" mac="c380c2a81933003b" mytime="1577341271209" name="bagno" nick="bagno" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="2" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
-    <device host="192.168.25.32" mac="3139322e3136382e32352e33323a373637363a4d61696e54564167656e7432" mytime="1577341271210" name="sottotv" offlimit="60" port="7676" samsungctl_dev_name="sottosamctl" tv_source="TV" type="DeviceUpnpIRTA2" upnp_location="http://192.168.25.32:7676/smp_2_" upnp_rc_dev_name="sottorc">
+    <device host="192.168.25.51" id="31" mac="c380c2a81933001f" mytime="1608635525516" name="salita_camera" nick="salita camera" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="0" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
+    <device host="192.168.25.51" id="59" mac="c380c2a81933003b" mytime="1608635525516" name="bagno" nick="bagno" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="2" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
+    <device host="192.168.25.32" mac="3139322e3136382e32352e33323a373637363a4d61696e54564167656e7432" mytime="1608635525517" name="sottotv" offlimit="60" port="7676" samsungctl_dev_name="sottosamctl" tv_source="TV" type="DeviceUpnpIRTA2" upnp_location="http://192.168.25.32:7676/smp_2_" upnp_rc_dev_name="sottorc">
       <d433s/>
       <dirs>
         <dir name="sam">
@@ -3678,8 +3716,8 @@
       <shs/>
       <timers/>
     </device>
-    <device host="192.168.25.51" id="62" mac="c380c2a81933003e" mytime="1577341271211" name="tende_iaterai_d" nick="tende iaterai d" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="2" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
-    <device host="192.168.25.32" mac="3139322e3136382e32352e33323a373637363a52656e646572696e67436f6e74726f6c" mytime="1577341271211" name="sottorc" offlimit="60" port="7676" type="DeviceUpnpIRRC" upnp_location="http://192.168.25.32:7676/smp_15_">
+    <device host="192.168.25.51" id="62" mac="c380c2a81933003e" mytime="1608635525518" name="tende_iaterai_d" nick="tende iaterai d" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="2" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
+    <device host="192.168.25.32" mac="3139322e3136382e32352e33323a373637363a52656e646572696e67436f6e74726f6c" mytime="1608635525518" name="sottorc" offlimit="60" port="7676" type="DeviceUpnpIRRC" upnp_location="http://192.168.25.32:7676/smp_15_">
       <d433s/>
       <dirs>
         <dir name="sottorc">
@@ -3778,7 +3816,7 @@
       <timers/>
       <states/>
     </device>
-    <device deviceId="ojcv40iw5dr7hmx61yua8eptbzgl3qfs" emit_delay="1.0" host="192.168.25.43" key="khggd54865SNJHGF" localIp="192.168.25.43" localPort="8000" mac="5ccf7f22bd13" mytime="1577341271214" name="magiccube" offlimit="60" password="0CA2579EDF9BF1039C56E0D98EF6AD15" port="32464" type="DeviceCT10">
+    <device deviceId="ojcv40iw5dr7hmx61yua8eptbzgl3qfs" emit_delay="1.0" host="192.168.25.43" key="khggd54865SNJHGF" localIp="192.168.25.43" localPort="8000" mac="5ccf7f22bd13" mytime="1608635525521" name="magiccube" offlimit="60" password="0CA2579EDF9BF1039C56E0D98EF6AD15" port="32464" type="DeviceCT10">
       <d433s/>
       <dirs>
         <dir name="lg">
@@ -3912,9 +3950,9 @@
       </shs>
       <timers/>
     </device>
-    <device host="192.168.25.51" id="57" mac="c380c2a819330039" mytime="1577341271220" name="tendacentraiedis" nick="tendacentraiedis" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="2" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
-    <device host="192.168.25.52" mac="accf23931af8" mytime="1577341271220" name="s202" offlimit="60" port="10000" rtime="60" sec1900="3786333670895" sst="0" state="0" stime="7" type="DeviceS20"/>
-    <device host="192.168.25.53" mac="3139322e3136382e32352e35333a373637363a4d61696e54564167656e7432" mytime="1577341271221" name="sottotveth" offlimit="60" port="7676" samsungctl_dev_name="sottosamctl" tv_source="TV" type="DeviceUpnpIRTA2" upnp_location="http://192.168.25.53:7676/smp_2_" upnp_rc_dev_name="sottotvrceth">
+    <device host="192.168.25.51" id="57" mac="c380c2a819330039" mytime="1608635525526" name="tendacentraiedis" nick="tendacentraiedis" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="2" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
+    <device host="192.168.25.52" mac="accf23931af8" mytime="1608635525527" name="s202" offlimit="60" port="10000" rtime="60" sec1900="3817626879567" sst="0" state="0" stime="7" type="DeviceS20"/>
+    <device host="192.168.25.53" mac="3139322e3136382e32352e35333a373637363a4d61696e54564167656e7432" mytime="1608635525527" name="sottotveth" offlimit="60" port="7676" samsungctl_dev_name="sottosamctl" tv_source="TV" type="DeviceUpnpIRTA2" upnp_location="http://192.168.25.53:7676/smp_2_" upnp_rc_dev_name="sottotvrceth">
       <d433s/>
       <dirs>
         <dir name="sam">
@@ -4055,29 +4093,30 @@
       </dirs>
       <shs>
         <sh name="2hdmi1">
-          <ir>sam:HDMI1</ir>
+          <ir>sam:HDMI2</ir>
           <ir>blackbeam1:sky:sky</ir>
         </sh>
         <sh name="tvsamsungterraon">
-          <ir>blackbeam1:samsung:1</ir>
+          <ir>blackbeam1:sky:sky</ir>
+          <ir>blackbeam1:samsung:power</ir>
           <ir>$10</ir>
-          <ir>sam:1</ir>
+          <ir>sam:HDMI2</ir>
         </sh>
       </shs>
       <timers/>
     </device>
-    <device host="192.168.25.51" id="67" mac="c380c2a819330043" mytime="1577341271226" name="libreria" nick="libreria" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="1" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
-    <device host="192.168.25.51" id="61" mac="c380c2a81933003d" mytime="1577341271226" name="cameretta" nick="cameretta" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="2" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
-    <device host="192.168.25.51" id="60" mac="c380c2a81933003c" mytime="1577341271226" name="cam_matrimoniale" nick="cam matrimoniale" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="1" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
-    <device host="192.168.25.51" id="66" mac="c380c2a819330042" mytime="1577341271227" name="angolo_tv" nick="angolo tv" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="1" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
-    <device host="192.168.25.51" id="25" mac="c380c2a819330019" mytime="1577341271227" name="discesa_cabina" nick="discesa cabina" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="0" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
-    <device emit_delay="1" host="192.168.25.44" mac="6279746561727261792862275c7839645c78393942345c786561342729" mytime="1577341271228" name="dev_6279746561727261792862275c7839645c78393942345c786561342729" offlimit="60" port="80" type="DeviceRM">
+    <device host="192.168.25.51" id="67" mac="c380c2a819330043" mytime="1608635525532" name="libreria" nick="libreria" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="1" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
+    <device host="192.168.25.51" id="61" mac="c380c2a81933003d" mytime="1608635525532" name="cameretta" nick="cameretta" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="2" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
+    <device host="192.168.25.51" id="60" mac="c380c2a81933003c" mytime="1608635525533" name="cam_matrimoniale" nick="cam matrimoniale" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="1" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
+    <device host="192.168.25.51" id="66" mac="c380c2a819330042" mytime="1608635525533" name="angolo_tv" nick="angolo tv" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="1" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
+    <device host="192.168.25.51" id="25" mac="c380c2a819330019" mytime="1608635525533" name="discesa_cabina" nick="discesa cabina" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="0" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
+    <device emit_delay="1.0" host="192.168.25.44" mac="6279746561727261792862275c7839645c78393942345c786561342729" mytime="1608635525533" name="dev_6279746561727261792862275c7839645c78393942345c786561342729" offlimit="60" port="80" type="DeviceRM">
       <d433s/>
       <dirs/>
       <shs/>
       <timers/>
     </device>
-    <device host="192.168.25.138" mac="3139322e3136382e32352e3133383a34393135343a52656e646572696e67436f6e74726f6c" mytime="1577341271229" name="dev_3139322e3136382e32352e3133383a34393135343a52656e646572696e67436f6e74726f6c" offlimit="60" port="49154" type="DeviceUpnpIRRC" upnp_location="http://192.168.25.138:49154/MediaRenderer/desc.xml">
+    <device host="192.168.25.138" mac="3139322e3136382e32352e3133383a34393135343a52656e646572696e67436f6e74726f6c" mytime="1608635525534" name="dev_3139322e3136382e32352e3133383a34393135343a52656e646572696e67436f6e74726f6c" offlimit="60" port="49154" type="DeviceUpnpIRRC" upnp_location="http://192.168.25.138:49154/MediaRenderer/desc.xml">
       <d433s/>
       <dirs>
         <dir name="dev_3139322e3136382e32352e3133383a34393135343a52656e646572696e67436f6e74726f6c">
@@ -4108,12 +4147,9 @@
       </dirs>
       <shs/>
       <timers/>
-      <states>
-        <state value="50">Volume</state>
-        <state value="False">Mute</state>
-      </states>
+      <states/>
     </device>
-    <device host="192.168.25.243" mac="3139322e3136382e32352e3234333a393139373a52656e646572696e67436f6e74726f6c" mytime="1577341271230" name="dev_3139322e3136382e32352e3234333a393139373a52656e646572696e67436f6e74726f6c" offlimit="60" port="9197" type="DeviceUpnpIRRC" upnp_location="http://192.168.25.243:9197/dmr">
+    <device host="192.168.25.243" mac="3139322e3136382e32352e3234333a393139373a52656e646572696e67436f6e74726f6c" mytime="1608635525535" name="dev_3139322e3136382e32352e3234333a393139373a52656e646572696e67436f6e74726f6c" offlimit="60" port="9197" type="DeviceUpnpIRRC" upnp_location="http://192.168.25.243:9197/dmr">
       <d433s/>
       <dirs>
         <dir name="dev_3139322e3136382e32352e3234333a393139373a52656e646572696e67436f6e74726f6c">
@@ -4146,7 +4182,7 @@
       <timers/>
       <states/>
     </device>
-    <device host="192.168.25.53" mac="3139322e3136382e32352e35333a373637363a52656e646572696e67436f6e74726f6c" mytime="1577341271232" name="dev_3139322e3136382e32352e35333a373637363a52656e646572696e67436f6e74726f6c" offlimit="60" port="7676" type="DeviceUpnpIRRC" upnp_location="http://192.168.25.53:7676/smp_15_">
+    <device host="192.168.25.53" mac="3139322e3136382e32352e35333a373637363a52656e646572696e67436f6e74726f6c" mytime="1608635525537" name="dev_3139322e3136382e32352e35333a373637363a52656e646572696e67436f6e74726f6c" offlimit="60" port="7676" type="DeviceUpnpIRRC" upnp_location="http://192.168.25.53:7676/smp_15_">
       <d433s/>
       <dirs>
         <dir name="dev_3139322e3136382e32352e35333a373637363a52656e646572696e67436f6e74726f6c">
@@ -4243,15 +4279,9 @@
       </dirs>
       <shs/>
       <timers/>
-      <states>
-        <state value="85">Contrast</state>
-        <state value="45">Brightness</state>
-        <state value="37">Volume</state>
-        <state value="False">Mute</state>
-        <state value="55">Sharpness</state>
-      </states>
+      <states/>
     </device>
-    <device host="192.168.25.53" mac="3139322e3136382e32352e35333a373637363a4d61696e54564167656e7432" mytime="1577341271236" name="dev_3139322e3136382e32352e35333a373637363a4d61696e54564167656e7432" offlimit="60" port="7676" samsungctl_dev_name="" tv_source="TV" type="DeviceUpnpIRTA2" upnp_location="http://192.168.25.53:7676/smp_2_" upnp_rc_dev_name="">
+    <device host="192.168.25.53" mac="3139322e3136382e32352e35333a373637363a4d61696e54564167656e7432" mytime="1608635525540" name="dev_3139322e3136382e32352e35333a373637363a4d61696e54564167656e7432" offlimit="60" port="7676" samsungctl_dev_name="" tv_source="TV" type="DeviceUpnpIRTA2" upnp_location="http://192.168.25.53:7676/smp_2_" upnp_rc_dev_name="">
       <d433s/>
       <dirs/>
       <shs/>
