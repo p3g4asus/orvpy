@@ -60,8 +60,8 @@ class DeviceUDP(Device):
     @staticmethod
     def mac_from_data(data):
         idx = data.find(MAC_START)
-        if idx >= 0 and idx+6 <= len(data):
-            return data[idx:idx+6]
+        if idx >= 0 and idx + 6 <= len(data):
+            return data[idx:idx + 6]
         else:
             return None
 
@@ -90,13 +90,14 @@ class DeviceUDP(Device):
                 elif data.find(DISCOVERY_S20) >= 0:
                     typed = DeviceS20
                 else:
-                    _LOGGER.info(f"Unknown device type {keyv} {tohexs(data[31:37])}")
+                    _LOGGER.info(
+                        f"Unknown device type {keyv} {tohexs(data[31:37])}")
                     continue
                 dev = typed(hp=buffcont.addr, mac=data[7:13],
                             sec1900=struct.unpack('<I', data[37:41])[0])
                 _LOGGER.info("Discovered device %s" % dev)
                 hosts[keyv] = dev
-                _LOGGER.info("ln = "+str(len(hosts))+" h = "+str(keyv))
+                _LOGGER.info("ln = " + str(len(hosts)) + " h = " + str(keyv))
         return hosts
 
     @staticmethod
@@ -140,7 +141,7 @@ class DeviceUDP(Device):
             for i in ipp:
                 try:
                     ipr += struct.pack('<B', int(i))
-                except: # noqa: E722
+                except:  # noqa: E722
                     _LOGGER.warning(f"{traceback.format_exc()}")
                     ipr += b'\x01'
             return ipr
@@ -158,11 +159,11 @@ class DeviceUDP(Device):
         start = 28
         ln = len(data)
         self.tablever = {}
-        while start+8 <= ln:
+        while start + 8 <= ln:
             '''_LOGGER.info("allv = "+data[start+2:start+8].encode('hex'))'''
-            vern = struct.unpack('<H', data[start+2:start+4])[0]
-            tabn = struct.unpack('<H', data[start+4:start+6])[0]
-            flgn = struct.unpack('<H', data[start+6:start+8])[0]
+            vern = struct.unpack('<H', data[start + 2:start + 4])[0]
+            tabn = struct.unpack('<H', data[start + 4:start + 6])[0]
+            flgn = struct.unpack('<H', data[start + 6:start + 8])[0]
             tabns = str(tabn)
             self.tablever[tabns] = {}
             self.tablever[tabns]['vern'] = vern
@@ -187,10 +188,10 @@ class DeviceUDP(Device):
         ln = len(data)
         self.timers = []
         while start < ln:
-            lenrec = struct.unpack('<H', data[start:start+2])[0]
-            rec = data[start:start+2+lenrec]
+            lenrec = struct.unpack('<H', data[start:start + 2])[0]
+            rec = data[start:start + 2 + lenrec]
             self.parse_timer_record(rec)
-            start += 2+lenrec
+            start += 2 + lenrec
 
     def parse_table4(self, data):
         if len(self.name) == 0 or self.name == self.default_name():
@@ -278,7 +279,7 @@ class DeviceUDP(Device):
         else:
             pay = self.rawtables["4"]
             lenrec = struct.unpack('<H', pay[28:30])[0]
-            record = pay[30:30+lenrec]
+            record = pay[30:30 + lenrec]
 
             if action.name is None:
                 nm = None
@@ -287,16 +288,16 @@ class DeviceUDP(Device):
             else:
                 nm = action.name.ljust(16)
             if nm is not None:
-                record = record[0:40]+s2b(nm)+record[56:]
+                record = record[0:40] + s2b(nm) + record[56:]
             if action.ip is not None:
-                record = record[0:118]+s2b(DeviceUDP.ip2string(action.ip)+DeviceUDP.ip2string(
-                    action.gateway)+DeviceUDP.ip2string(action.nmask))+b'\x00\x01'+record[132:]
+                record = record[0:118] + s2b(DeviceUDP.ip2string(action.ip) + DeviceUDP.ip2string(
+                    action.gateway) + DeviceUDP.ip2string(action.nmask)) + b'\x00\x01' + record[132:]
             if action.timezone is not None:
-                record = record[0:132]+(b'\x01\x00' if action.timezone ==
-                                        DeviceUDP.TIMEZONE_NOT_SET else b'\x00'+struct.pack('<b', action.timezone))+record[134:]
+                record = record[0:132] + (b'\x01\x00' if action.timezone ==
+                                          DeviceUDP.TIMEZONE_NOT_SET else b'\x00' + struct.pack('<b', action.timezone)) + record[134:]
             if action.timer_off_after_on is not None:
-                record = record[0:134]+(b'\x00\xff' if action.timer_off_after_on <=
-                                        0 else b'\x01\x00')+struct.pack('<H', action.timer_off_after_on)+record[138:]
+                record = record[0:134] + (b'\x00\xff' if action.timer_off_after_on <=
+                                          0 else b'\x01\x00') + struct.pack('<H', action.timer_off_after_on) + record[138:]
             return record
 
 # concetto di handler dopo send_action rimane ma  ha come parametri rv (valore di ritorno e data che dipende dall'azione')
@@ -308,13 +309,13 @@ class DeviceUDP(Device):
         elif isinstance(action, ActionStatechange) and action.newstate != Device.GET_STATE_ACTION:
             newst = self.state_value_conv(action.newstate)
             return MAGIC + STATECHANGE_LEN + STATECHANGE_ID + self.mac + PADDING_1\
-                + PADDING_2+(b'\x01' if newst != "0" else b'\x00')
+                + PADDING_2 + (b'\x01' if newst != "0" else b'\x00')
         elif isinstance(action, ActionStatechange):
             return b''
         elif isinstance(action, ActionViewtable):
             return MAGIC + VIEW_TABLE_LEN + VIEW_TABLE_ID + self.mac + PADDING_1\
-                + PADDING_2+struct.pack('<B', action.tablenum)+b'\x00' + \
-                struct.pack('<B', action.vflag)+PADDING_2
+                + PADDING_2 + struct.pack('<B', action.tablenum) + b'\x00' + \
+                struct.pack('<B', action.vflag) + PADDING_2
         elif isinstance(action, ActionSettable):
             if isinstance(action, ActionSettable4):
                 record = self.get_table4_record(action)
@@ -328,7 +329,7 @@ class DeviceUDP(Device):
                 if action.actionid != DELRECORD_CODE:
                     pay += struct.pack('<H', len(record))
                 pay += record
-                return MAGIC+struct.pack('>H', len(pay)+4)+pay
+                return MAGIC + struct.pack('>H', len(pay) + 4) + pay
         return Device.get_action_payload(self, action)
 
     def __init__(self, hp=('', 0), mac='', root=None, timeout=DEFAULT_RESUBSCRIPTION_TIMEOUT, name='', sec1900=0, lsa_timeout=DEFAULT_RESUBSCRIPTION_STIMEOUT, **kw):
@@ -337,8 +338,8 @@ class DeviceUDP(Device):
             self.subscribe_time = 0
             self.resubscription_timeout = timeout
             self.last_subs_action_timeout = lsa_timeout
-            self.sec1900 = int(((datetime.now()-datetime(1900, 1, 1, 0, 0, 0, 0)).total_seconds() -
-                                (datetime.utcnow()-datetime.now()).total_seconds()-sec1900)*1000)
+            self.sec1900 = int(((datetime.now() - datetime(1900, 1, 1, 0, 0, 0, 0)).total_seconds() -
+                                (datetime.utcnow() - datetime.now()).total_seconds() - sec1900) * 1000)
         else:
             self.subscribe_time = int(root.attributes['sst'].value)
             self.sec1900 = int(root.attributes['sec1900'].value)
@@ -440,7 +441,7 @@ class DeviceUDP(Device):
 
     def needs_resubscription(self):
         now = time.time()
-        return now-self.subscribe_time >= self.resubscription_timeout or now-self.last_subs_action >= self.last_subs_action_timeout
+        return now - self.subscribe_time >= self.resubscription_timeout or now - self.last_subs_action >= self.last_subs_action_timeout
 
     def subs_action(self):
         self.last_subs_action = int(time.time())
@@ -484,7 +485,7 @@ class DeviceAllOne(DeviceUDP, ManTimerManager, IrManager):
         elif isinstance(action, ActionEmitir):
             if len(action.irdata):
                 irc = action.irdata[0]
-                plen = struct.pack('>H', len(irc)+26)
+                plen = struct.pack('>H', len(irc) + 26)
                 ilen = struct.pack('<H', len(irc))
                 rnd = struct.pack('<H', random.randint(0, 65535))
                 return MAGIC + plen + EMITIR_ID + self.mac + PADDING_1\
@@ -519,13 +520,13 @@ class DeviceAllOne(DeviceUDP, ManTimerManager, IrManager):
 
     def get_arduraw(self, remote, irdata):
         irenc = list(struct.unpack_from(
-            '<'+('H'*((len(irdata[0])-16)/2)), irdata[0], 16))
+            '<' + ('H' * ((len(irdata[0]) - 16) / 2)), irdata[0], 16))
         return {'key': irdata[1], 'remote': remote, 'a': irenc}
 
     def get_from_arduraw(self, msg):
-        tpl = (0, 0, len(msg['a'])*2+16, 0, 0, 0, 0, len(msg['a'])*2)
-        out = struct.pack('<'+('H'*len(tpl)), *tpl)
-        out += struct.pack('<'+('H'*len(msg['a'])), *tuple(msg['a']))
+        tpl = (0, 0, len(msg['a']) * 2 + 16, 0, 0, 0, 0, len(msg['a']) * 2)
+        out = struct.pack('<' + ('H' * len(tpl)), *tpl)
+        out += struct.pack('<' + ('H' * len(msg['a'])), *tuple(msg['a']))
         return (out, msg['key'], {})
 
 
@@ -564,7 +565,8 @@ class DeviceS20(DeviceUDP):
         return DeviceUDP.do_presend_operations(self, action, actionexec)
 
     def do_postsend_operations(self, action, actionexec):
-        if isinstance(action, ActionStatechange) and action.newstate != Device.GET_STATE_ACTION:  # quando devo solo ottenere lo stato basta il subscribe che si fa in presend
+        # quando devo solo ottenere lo stato basta il subscribe che si fa in presend
+        if isinstance(action, ActionStatechange) and action.newstate != Device.GET_STATE_ACTION:
             actionexec.insert_action(ActionSubscribe(self), 1)
         else:
             DeviceUDP.do_postsend_operations(self, action, actionexec)
@@ -585,7 +587,7 @@ class DeviceS20(DeviceUDP):
                 elif i == 1 or (i == -1 and self.state == "0"):
                     event.EventManager.fire(eventname='ExtInsertAction', hp=(
                         self.host, self.port), cmdline="", action=ActionStateon(self))
-        except: # noqa: E722
+        except:  # noqa: E722
             _LOGGER.warning(f"{traceback.format_exc()}")
 
     def xml_element(self, root, flag=0):

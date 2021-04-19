@@ -38,7 +38,7 @@ class DevicePrimelan(Device):
     def state_value_conv(self, s):
         try:
             realv = int(s)
-        except: # noqa: E722
+        except:  # noqa: E722
             realv = 0
         if realv == 0:
             return "0"
@@ -46,11 +46,11 @@ class DevicePrimelan(Device):
             if self.subtype == 1:
                 try:
                     ost = int(self.oldstate)
-                except: # noqa: E722
+                except:  # noqa: E722
                     ost = 0
                 try:
                     st = int(self.state)
-                except: # noqa: E722
+                except:  # noqa: E722
                     st = 0
                 if st:
                     return str(st)
@@ -65,14 +65,16 @@ class DevicePrimelan(Device):
 
     def do_presend_operations(self, action, actionexec):
         if isinstance(action, ActionStatechange) and action.newstate != DevicePrimelan.GET_STATE_ACTION and time.time() - self.last_get > 10:
-            actionexec.insert_action(ActionStatechange(self, DevicePrimelan.GET_STATE_ACTION), 0)
+            actionexec.insert_action(ActionStatechange(
+                self, DevicePrimelan.GET_STATE_ACTION), 0)
             return 0
         else:
             return Device.do_presend_operations(self, action, actionexec)
 
     def do_postsend_operations(self, action, actionexec):
         if isinstance(action, ActionStatechange) and action.newstate != DevicePrimelan.GET_STATE_ACTION:
-            actionexec.insert_action(ActionStatechange(self, DevicePrimelan.GET_STATE_ACTION), 1)
+            actionexec.insert_action(ActionStatechange(
+                self, DevicePrimelan.GET_STATE_ACTION), 1)
         else:
             Device.do_postsend_operations(self, action, actionexec)
 
@@ -90,8 +92,8 @@ class DevicePrimelan(Device):
         try:
             if sub == "state":
                 event.EventManager.fire(eventname='ExtInsertAction', hp=(
-                        self.host, self.port), cmdline="", action=ActionStatechange(self, b2s(msg.payload)))
-        except: # noqa: E722
+                    self.host, self.port), cmdline="", action=ActionStatechange(self, b2s(msg.payload)))
+        except:  # noqa: E722
             _LOGGER.warning(f"{traceback.format_exc()}")
 
     def mqtt_publish_onfinish(self, action, retval):
@@ -160,7 +162,8 @@ class DevicePrimelan(Device):
             for div in divs:
                 tk = div.attributes['tk'].value
                 qindex = div.attributes['qindex'].value
-            _LOGGER.info('received '+txt+" tk = "+tk+" qindex = "+qindex)
+            _LOGGER.info('received ' + txt + " tk = " +
+                         tk + " qindex = " + qindex)
             r = requests.post('http://{}:{}/cgi-bin/web.cgi'.format(*hp),
                               data={'tk': tk, 'qindex': qindex, 'mod': 'cmd'}, timeout=timeout)
             lst = r.json()['cmd']
@@ -179,9 +182,9 @@ class DevicePrimelan(Device):
                     state=DevicePrimelan.http_state_to_real_state(d),
                     passw=passw,
                     port2=port2)
-                out['{}:{}'.format(*hp)+':'+idv] = dev
+                out['{}:{}'.format(*hp) + ':' + idv] = dev
             return out
-        except: # noqa: E722
+        except:  # noqa: E722
             _LOGGER.warning(f"{traceback.format_exc()}")
             return {}
 
@@ -213,12 +216,12 @@ class DevicePrimelan(Device):
             newstate = -newstate
         else:
             onoff = 0x30E0
-        aesc = b'\x08\x00\x00\x00\x69\x00\x00\x00'+struct.pack("<H", onoff)+struct.pack(
-            "<B", int(self.id))+b'\x00'+struct.pack("<B", int(newstate))+b'\x00\x02\x02'
+        aesc = b'\x08\x00\x00\x00\x69\x00\x00\x00' + struct.pack("<H", onoff) + struct.pack(
+            "<B", int(self.id)) + b'\x00' + struct.pack("<B", int(newstate)) + b'\x00\x02\x02'
         cipher = AES.new(self.key, AES.MODE_CBC, self.iv)
         aesc2 = cipher.encrypt(aesc)
-        crc = DevicePrimelan.crc16(bytearray(out+aesc2))
-        return pre+struct.pack("<H", crc)+out+aesc2
+        crc = DevicePrimelan.crc16(bytearray(out + aesc2))
+        return pre + struct.pack("<H", crc) + out + aesc2
 
     def change_state_http(self, pay, timeout):
         r = requests.post('http://{}:{}/cgi-bin/web.cgi'.format(self.host, self.port),
@@ -235,7 +238,8 @@ class DevicePrimelan(Device):
             r = requests.post('http://{}:{}/cgi-bin/web.cgi'.format(self.host, self.port),
                               data={'tk': self.tk, 'qindex': self.qindex, 'mod': 'cmd'}, timeout=timeout)
             lst = r.json()['cmd']
-            _LOGGER.info(f'Get state (difftime = {now - self.last_get}) rv = {lst}')
+            _LOGGER.info(
+                f'Get state (difftime = {now - self.last_get}) rv = {lst}')
             rv = None
             self.last_get = now
             for d in lst:
@@ -282,9 +286,9 @@ class DevicePrimelan(Device):
             self.passw = passw
             self.port2 = port2
 
-        self.key = s2b(self.passw)+(b'\x00'*(16-len(self.passw)))
-        self.iv = reduce(lambda x, y: x+struct.pack("<B",
-                                                    y[1] ^ y[0]), enumerate(self.key), b'')
+        self.key = s2b(self.passw) + (b'\x00' * (16 - len(self.passw)))
+        self.iv = reduce(lambda x, y: x + struct.pack("<B",
+                                                      y[1] ^ y[0]), enumerate(self.key), b'')
 
     def to_dict(self):
         rv = Device.to_dict(self)
@@ -316,7 +320,7 @@ class DevicePrimelan(Device):
                     rv = self.change_state_tcp(state, timeout)
                 else:
                     rv = 1
-            except: # noqa: E722
+            except:  # noqa: E722
                 _LOGGER.warning(f"{traceback.format_exc()}")
                 rv = None
             return action.exec_handler(rv, self.state)
@@ -330,7 +334,7 @@ class DevicePrimelan(Device):
                             self.oldstate = self.state
                         self.state = rv
                     rv = 1
-            except: # noqa: E722
+            except:  # noqa: E722
                 _LOGGER.warning(f"{traceback.format_exc()}")
                 rv = None
             return action.exec_handler(rv, self.state)

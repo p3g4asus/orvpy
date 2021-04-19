@@ -49,7 +49,7 @@ class DeviceUpnp(Device):
             try:
                 self.upnp_obj = upnpclient.Device(
                     self.upnp_location, self.name)
-            except: # noqa: E722
+            except:  # noqa: E722
                 _LOGGER.warning(f"{traceback.format_exc()}")
                 self.upnp_obj = None
         return self.upnp_obj
@@ -69,8 +69,8 @@ class DeviceUpnp(Device):
         try:
             if sub == "state":
                 event.EventManager.fire(eventname='ExtInsertAction', hp=(
-                        self.host, self.port), cmdline="", action=ActionStatechange(self, b2s(msg.payload)))
-        except: # noqa: E722
+                    self.host, self.port), cmdline="", action=ActionStatechange(self, b2s(msg.payload)))
+        except:  # noqa: E722
             _LOGGER.warning(f"{traceback.format_exc()}")
 
     def mqtt_publish_onfinish(self, action, retval):
@@ -111,22 +111,22 @@ class DeviceUpnp(Device):
         try:
             _LOGGER.info("Searching upnp devices")
             devs = upnpclient.discover(timeout=5)
-            _LOGGER.info("Found "+str(len(devs))+" upnp devices")
+            _LOGGER.info("Found " + str(len(devs)) + " upnp devices")
             rc = {"RenderingControl": DeviceUpnpIRRC,
                   "MainTVAgent2": DeviceUpnpIRTA2}
             for d in devs:
                 u = upar(d.location)
                 for k, v in rc.items():
                     if k in d.service_map:
-                        _LOGGER.info("Found "+k+" at "+d.location)
+                        _LOGGER.info("Found " + k + " at " + d.location)
                         hp = (u.hostname, u.port)
-                        m = '{}:{}:'.format(*hp)+k
+                        m = '{}:{}:'.format(*hp) + k
                         out[m] = v(hp=hp,
                                    mac=m,
                                    name='',
                                    location=d.location,
                                    deviceobj=d)
-        except: # noqa: E722
+        except:  # noqa: E722
             _LOGGER.warning(f"{traceback.format_exc()}")
         return out
 
@@ -159,7 +159,7 @@ class ParseException(ContextException):
 def _getint(buf, offset):
     """Helper function to extract a 16-bit little-endian unsigned from a char
     buffer 'buf' at offset 'offset'..'offset'+2."""
-    x = struct.unpack('<H', buf[offset:offset+2])
+    x = struct.unpack('<H', buf[offset:offset + 2])
     return x[0]
 
 
@@ -187,7 +187,7 @@ class Channel(object):
                 'ProgNum')[0].childNodes[0].nodeValue
             self.dispno = self.major_ch
             self.title = ''
-        except: # noqa: E722
+        except:  # noqa: E722
             raise ParseException("Wrong XML document")
 
     def _parse_dat(self, buf):
@@ -231,7 +231,7 @@ class Channel(object):
         self.dispno = b2s(buf[12:16].rstrip(b'\x00'))
 
         title_len = _getint(buf, 22)
-        self.title = buf[24:24+title_len].decode('utf-8')
+        self.title = buf[24:24 + title_len].decode('utf-8')
 
     def display_string(self):
         """Returns a unicode display string, since both __repr__ and __str__ convert it
@@ -366,7 +366,7 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
 
     def get_current_source(self):
         now = time.time()
-        if not len(self.current_source) or now-self.current_source_t >= 10:
+        if not len(self.current_source) or now - self.current_source_t >= 10:
             try:
                 vv = self.a["GetCurrentExternalSource"]()
                 if 'Result' in vv and vv['Result'] == "OK":
@@ -375,7 +375,7 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                     self.current_source_t = now
                 else:
                     rv = ''
-            except: # noqa: E722
+            except:  # noqa: E722
                 _LOGGER.warning(f"{traceback.format_exc()}")
                 rv = ''
             self.current_source = rv
@@ -436,7 +436,7 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                     self.get_channels_list()
                     self.get_sources_list()
                     self.fill_ir_list()
-                except: # noqa: E722
+                except:  # noqa: E722
                     _LOGGER.warning(f"{traceback.format_exc()}")
                     self.destroy_device()
 
@@ -467,8 +467,8 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                     if mo is not None:
                         if len(mo.group(2)):
                             try:
-                                del dc[mo.group(1)+"-"]
-                            except: # noqa: E722
+                                del dc[mo.group(1) + "-"]
+                            except:  # noqa: E722
                                 pass
                 dc.update(v)
 
@@ -483,7 +483,7 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                 r = requests.get(res['ChannelListURL'])
                 webContent = r.content
                 self.channels = DeviceUpnpIRTA2._parse_channel_list(webContent)
-            except: # noqa: E722
+            except:  # noqa: E722
                 _LOGGER.warning(f"{traceback.format_exc()}")
                 self.channels = {}
 
@@ -509,7 +509,7 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                             if 'Result' in vv and vv['Result'] == "OK":
                                 rv = 1
                             else:
-                                _LOGGER.info("Change channel rv "+str(vv))
+                                _LOGGER.info("Change channel rv " + str(vv))
                                 rv = 127
                         else:
                             rv = 255
@@ -521,11 +521,11 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                             if 'Result' in vv and vv['Result'] == "OK":
                                 rv = 1
                             else:
-                                _LOGGER.info("Change source rv "+str(vv))
+                                _LOGGER.info("Change source rv " + str(vv))
                                 rv = 127
                         else:
                             rv = 255
-            except: # noqa: E722
+            except:  # noqa: E722
                 _LOGGER.warning(f"{traceback.format_exc()}")
         elif isinstance(action, ActionGetstate):
             outstate = dict()
@@ -539,7 +539,7 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                         outstate['channel'] = c.major_ch
                     else:
                         rv = 32
-                except: # noqa: E722
+                except:  # noqa: E722
                     _LOGGER.warning(f"{traceback.format_exc()}")
                     rv = 2
                 vv = self.get_current_source()
@@ -573,7 +573,7 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                     if p != 'av' and p != 'AV':
                         self.sources[DeviceUpnp.correct_upnp_name(
                             src.sname)] = src
-            except: # noqa: E722
+            except:  # noqa: E722
                 _LOGGER.warning(f"{traceback.format_exc()}")
                 self.sources = None
 
@@ -590,12 +590,12 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
                                   'one channel (%d bytes (actual) vs. 128 bytes' % len(channel_list)),
                                  ('Channel list: %s' % repr(channel_list)))
 
-        if (len(channel_list)-4) % 124 != 0:
+        if (len(channel_list) - 4) % 124 != 0:
             raise ParseException(('channel list\'s size (%d) minus 128 (header) is not a multiple of '
                                   '124 bytes' % len(channel_list)),
                                  ('Channel list: %s' % repr(channel_list)))
 
-        actual_channel_list_len = (len(channel_list)-4) / 124
+        actual_channel_list_len = (len(channel_list) - 4) / 124
         expected_channel_list_len = _getint(channel_list, 2)
         if actual_channel_list_len != expected_channel_list_len:
             raise ParseException(('Actual channel list length ((%d-4)/124=%d) does not equal expected '
@@ -606,7 +606,7 @@ class DeviceUpnpIRTA2(DeviceUpnpIR):
         channels = {}
         pos = 4
         while pos < len(channel_list):
-            chunk = channel_list[pos:pos+124]
+            chunk = channel_list[pos:pos + 124]
             try:
                 ch = Channel(chunk)
                 channels[ch.dispno] = ch
@@ -650,10 +650,10 @@ class DeviceUpnpIRRC(DeviceUpnpIR):
                     if s == "mute":
                         dc[s] = (s, s, {"type": DeviceUpnpIR.RC_KEY})
                     else:
-                        dc[s+"+"] = (s+"+", s+"+",
-                                     {"type": DeviceUpnpIR.RC_KEY})
+                        dc[s + "+"] = (s + "+", s + "+",
+                                       {"type": DeviceUpnpIR.RC_KEY})
                         for x in range(0, 104, 5):
-                            m = s+str(x)+"+"
+                            m = s + str(x) + "+"
                             dc[m] = (m, m, {"type": DeviceUpnpIR.RC_KEY})
 
             k = list(dc.keys())
@@ -672,14 +672,14 @@ class DeviceUpnpIRRC(DeviceUpnpIR):
                 # _LOGGER.info("UUU "+key+" "+rem)
                 mo = re.search("^([^0-9\\+\\-]+)([0-9]*)([\\+\\-]?)$", key)
                 if mo is not None:
-                    fp = mo.group(1)+("+"*len(mo.group(3)))
+                    fp = mo.group(1) + ("+" * len(mo.group(3)))
                     if fp in self.dir[rem]:
                         p = mo.group(2)
                         return (key, int(p) if len(p) else 1, {"type": DeviceUpnpIR.RC_KEY})
                 mo = re.search("^([^#\\+\\-]+)([\\+\\-]?)#([0-9]+)$", key)
                 # _LOGGER.info("DDDD "+key+" "+rem)
                 if mo is not None:
-                    fp = mo.group(1)+("+"*len(mo.group(2)))
+                    fp = mo.group(1) + ("+" * len(mo.group(2)))
                     if fp in self.dir[rem]:
                         return (fp, int(mo.group(3)), {"type": DeviceUpnpIR.RC_KEY})
         return []
@@ -723,7 +723,7 @@ class DeviceUpnpIRRC(DeviceUpnpIR):
                     self.states = dict.fromkeys(self.params)
                     self.state_init = False
                     self.get_states()
-                except: # noqa: E722
+                except:  # noqa: E722
                     _LOGGER.warning(f"{traceback.format_exc()}")
                     self.destroy_device()
         if self.upnp_obj and self.a and len(self.dir) == 0 and self.state_init:
@@ -734,19 +734,21 @@ class DeviceUpnpIRRC(DeviceUpnpIR):
     def set_state(self, k, val):
         if self.init_device():
             try:
-                if "Set"+k in self.a:
+                if "Set" + k in self.a:
                     if k == "Mute":
                         self.get_states([k])
                         val = 0 if self.states[k] else 1
-                    a = self.a['Set'+k]
+                    a = self.a['Set' + k]
                     p = {'InstanceID': 0, 'Channel': 'Master'}
                     p[a.argsdef_in[2][0]] = str(val)
                     out = a(**p)
                     self.get_states([k])
-                    _LOGGER.info("Calling method upnp "+k+" out "+str(out))
+                    _LOGGER.info("Calling method upnp " +
+                                 k + " out " + str(out))
                     return self.states[k]
-            except: # noqa: E722
-                _LOGGER.info("Action Set"+k+" args "+str(self.a['Set'+k].argsdef_in))
+            except:  # noqa: E722
+                _LOGGER.info("Action Set" + k + " args " +
+                             str(self.a['Set' + k].argsdef_in))
                 self.destroy_device()
                 _LOGGER.warning(f"{traceback.format_exc()}")
         return None
@@ -758,9 +760,9 @@ class DeviceUpnpIRRC(DeviceUpnpIR):
                 what = list(self.states.keys())
             for k in what:
                 try:
-                    st = self.a['Get'+k](InstanceID=0, Channel='Master')
-                    if len(st) > 1 and 'Current'+k in st:
-                        st = st['Current'+k]
+                    st = self.a['Get' + k](InstanceID=0, Channel='Master')
+                    if len(st) > 1 and 'Current' + k in st:
+                        st = st['Current' + k]
                     elif len(st):
                         st = next(iter(st.values()))
                     else:
@@ -771,10 +773,11 @@ class DeviceUpnpIRRC(DeviceUpnpIR):
                         if rv < 500:
                             rv += 500
                             self.state_init = True
-                    _LOGGER.info(self.name+" Upnp State "+k+" = "+str(st))
-                except: # noqa: E722
+                    _LOGGER.info(self.name + " Upnp State " +
+                                 k + " = " + str(st))
+                except:  # noqa: E722
                     _LOGGER.warning(f"{traceback.format_exc()}")
         if rv >= 500:
-            return rv-500
+            return rv - 500
         else:
             return None

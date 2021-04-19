@@ -68,9 +68,9 @@ class ManTimerManager(object):
         else:
             d = None
         if d is not None:
-            rv = threading.Timer((d-now).total_seconds(),
+            rv = threading.Timer((d - now).total_seconds(),
                                  self.exec_timer, (t,))
-            rv.name = ("timer"+str(t["code"]))
+            rv.name = ("timer" + str(t["code"]))
             rv.daemon = True
             rv.start()
         return rv
@@ -136,7 +136,7 @@ class ManTimerManager(object):
             if r > 128:
                 days = ''
                 for i in range(7):
-                    dt = date(2016, 1, 4+i)
+                    dt = date(2016, 1, 4 + i)
                     mask = (1 << i)
                     if mask & r:
                         if len(days):
@@ -172,12 +172,12 @@ class ManTimerManager(object):
                             printable_l = printable.split(',')
                             rep = 128
                             for i in range(7):
-                                dt = date(2016, 1, 4+i)
+                                dt = date(2016, 1, 4 + i)
                                 day = dt.strftime('%a')
                                 if day in printable_l:
                                     rep |= (1 << i)
                         t['rep'] = 0 if rep == 128 else rep
-                    except: # noqa: E722
+                    except:  # noqa: E722
                         pass
                     ''''t['rep'] = int(ss.attributes['value'].value)'''
                     break
@@ -207,6 +207,6 @@ class ManTimerManager(object):
                     break
                 if t['year'] is not None:
                     out.append(t)
-            except: # noqa: E722
+            except:  # noqa: E722
                 _LOGGER.warning(f"{traceback.format_exc()}")
         return out

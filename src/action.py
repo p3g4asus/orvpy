@@ -41,7 +41,7 @@ class Action(object):
     def __str__(self, *args, **kwargs):
         rv = self.__class__.__name__
         if self.device is not None:
-            rv += " d = "+self.device.name
+            rv += " d = " + self.device.name
         return rv
 
     def set_randomid(self, randid):
@@ -55,7 +55,8 @@ class Action(object):
         if device is None or device.__class__.__name__.startswith("Device"):
             self.device = device
         else:
-            raise TypeError(f'Invalid device argument. Class is {device.__class__.__name__} value = {device}')
+            raise TypeError(
+                f'Invalid device argument. Class is {device.__class__.__name__} value = {device}')
 
     def to_json(self):
         return {'actionclass': self.__class__.__name__,
@@ -75,7 +76,7 @@ class Action(object):
 
     def run(self, actionexec, returnvalue=RV_NOT_EXECUTED):
         now = time.time()
-        if self.device is None or now-self.device.offt > self.device.offlimit:
+        if self.device is None or now - self.device.offt > self.device.offlimit:
             rv = self.runint(actionexec, returnvalue)
             if rv is None and self.device is not None and self.device.offt >= 0:
                 now = time.time()
@@ -143,11 +144,7 @@ class ActionSubscribe(Action):
 
 class ActionDiscovery(Action):
 
-    def __init__(self, primelanhost='', primelanport=80, primelanpassw='', primelancodu='', primelanport2=0):
-        self.php = (primelanhost, primelanport)
-        self.ppasw = primelanpassw
-        self.pcodu = primelancodu
-        self.pport2 = primelanport2
+    def __init__(self):
         self.hosts = {}
         super(ActionDiscovery, self).__init__(None)
         self.m_device = False
@@ -171,15 +168,14 @@ class ActionDiscovery(Action):
         from device.devicerm import DeviceRM
         from device.deviceudp import DeviceUDP
         from device.deviceupnp import DeviceUpnp
+        from device.devicetasmotaswitch import DeviceTasmotaswitch
         self.hosts.update(DeviceCT10.discovery(actionexec, timeout))
         self.hosts.update(DeviceRM.discovery(actionexec, timeout))
-        php = self.php if len(self.php[0]) else actionexec.prime_hp
-        ppasw = self.ppasw if len(self.ppasw) else actionexec.prime_pass
-        pcodu = self.pcodu if len(self.pcodu) else actionexec.prime_code
-        pport2 = self.pport2 if self.pport2 else actionexec.prime_port2
-        if len(php[0]) and len(ppasw) and len(pcodu):
+        if len(actionexec.prime_hp[0]) and len(actionexec.prime_pass) and len(actionexec.prime_code):
             self.hosts.update(DevicePrimelan.discovery(
-                php, ppasw, pcodu, pport2, timeout))
+                actionexec.prime_hp, actionexec.prime_pass, actionexec.prime_code, actionexec.prime_port2, timeout))
+        if len(actionexec.mqtt_host):
+            self.hosts.update(DeviceTasmotaswitch.discovery((actionexec.mqtt_host, actionexec.mqtt_port), timeout))
         self.hosts.update(DeviceUpnp.discovery())
         self.hosts.update(DeviceUDP.discovery(actionexec, timeout))
         return 1 if len(self.hosts) else 2
@@ -190,7 +186,7 @@ class ActionDiscovery(Action):
 
 class ActionPause(Action):
     def __str__(self, *args, **kwargs):
-        return Action.__str__(self, *args, **kwargs)+" p = "+str(self.pause)
+        return Action.__str__(self, *args, **kwargs) + " p = " + str(self.pause)
 
     def __init__(self, p):
         super(ActionPause, self).__init__(None)
@@ -238,7 +234,7 @@ class ActionNotifystate(Action):
 
 class ActionIrask(Action):
     def __str__(self, *args, **kwargs):
-        return Action.__str__(self, *args, **kwargs)+" a = "+self.irname
+        return Action.__str__(self, *args, **kwargs) + " a = " + self.irname
 
     def __init__(self, device, irname):
         super(ActionIrask, self).__init__(device)
@@ -248,7 +244,7 @@ class ActionIrask(Action):
         return False
 
     def runint(self, actionexec, returnvalue=RV_NOT_EXECUTED):
-        _LOGGER.info("Please press "+self.irname)
+        _LOGGER.info("Please press " + self.irname)
         return 1
 
     def to_json(self):
@@ -261,7 +257,7 @@ class ActionIrask(Action):
             remnm = self.irname.split(':')
             keynm = remnm[1]
             remnm = remnm[0]
-        except: # noqa: E722
+        except:  # noqa: E722
             keynm = self.irname
             remnm = ""
         return [dict(topic=self.device.mqtt_topic("stat", "learn"), msg=json.dumps([dict(remote=remnm, key=keynm, status=-2)]), options=dict())]
@@ -281,7 +277,7 @@ class ActionExit(Action):
 class ActionStatechange(Action):
 
     def __str__(self, *args, **kwargs):
-        return Action.__str__(self, *args, **kwargs)+" st = "+self.newstate
+        return Action.__str__(self, *args, **kwargs) + " st = " + self.newstate
 
     def __init__(self, device, newstate):
         super(ActionStatechange, self).__init__(device)
@@ -305,7 +301,7 @@ class ActionStateon(ActionStatechange):
 
 class ActionBackup(Action):
     def __str__(self, *args, **kwargs):
-        return Action.__str__(self, *args, **kwargs)+" topic = "+str(self.topic)
+        return Action.__str__(self, *args, **kwargs) + " topic = " + str(self.topic)
 
     def __init__(self, device, topic, convert, *args):
         super(ActionBackup, self).__init__(device)
@@ -326,14 +322,14 @@ class ActionBackup(Action):
 
     def mqtt_publish_onfinish(self, rv):
         if rv == 1:
-            return [dict(topic="cmnd/"+self.topic+"/learn", msg=json.dumps(self.publish), options=dict())]
+            return [dict(topic="cmnd/" + self.topic + "/learn", msg=json.dumps(self.publish), options=dict())]
         else:
             return list()
 
 
 class ActionInsertKey(Action):
     def __str__(self, *args, **kwargs):
-        return Action.__str__(self, *args, **kwargs)+" rk = "+self.remote+':'+self.key
+        return Action.__str__(self, *args, **kwargs) + " rk = " + self.remote + ':' + self.key
 
     def __init__(self, device, remote, key, a, other={}, *args):
         super(ActionInsertKey, self).__init__(device)
@@ -364,7 +360,7 @@ class ActionLearnir(Action):
         return 25
 
     def __str__(self, *args, **kwargs):
-        return Action.__str__(self, *args, **kwargs)+" ir = "+str(self.irname)
+        return Action.__str__(self, *args, **kwargs) + " ir = " + str(self.irname)
 
     def __init__(self, device, *args):
         super(ActionLearnir, self).__init__(device)
@@ -407,7 +403,7 @@ class ActionLearnir(Action):
                     return 1
                 else:
                     self.idx += 1
-            except: # noqa: E722
+            except:  # noqa: E722
                 _LOGGER.warning(f"{traceback.format_exc()}")
                 self.idx += 1
         return Action.do_presend_operations(self, actionexec)
@@ -450,7 +446,7 @@ class ActionLearnir(Action):
 class ActionEditraw(Action):
 
     def __str__(self, *args, **kwargs):
-        return Action.__str__(self, *args, **kwargs)+" ir = "+self.irshname+'/'+self.newraw
+        return Action.__str__(self, *args, **kwargs) + " ir = " + self.irshname + '/' + self.newraw
 
     def modifies_device(self):
         return True
@@ -565,7 +561,7 @@ class ActionCreatesh(Action):
         return rv
 
     def mqtt_publish_onfinish(self, rv):
-        return [dict(topic=self.device.mqtt_topic("stat", "learn"), msg=json.dumps([dict(key='@'+self.shname, remote='', status=rv)]), options=dict())]
+        return [dict(topic=self.device.mqtt_topic("stat", "learn"), msg=json.dumps([dict(key='@' + self.shname, remote='', status=rv)]), options=dict())]
 
 
 class ActionEmitir(Action):
@@ -594,17 +590,18 @@ class ActionEmitir(Action):
                     irname.append(a)
                 elif len(a) > 1 and a[0] == '@':
                     try:
-                        c = args[0:x+1] + tuple(device.sh[a[1:]]) + args[x+1:]
+                        c = args[0:x + 1] + \
+                            tuple(device.sh[a[1:]]) + args[x + 1:]
                         args = c
-                    except: # noqa: E722
+                    except:  # noqa: E722
                         pass
                 elif len(dname):
-                    irname.append(dname+":"+a)
+                    irname.append(dname + ":" + a)
             x += 1
         return irname
 
     def __str__(self, *args, **kwargs):
-        return Action.__str__(self, *args, **kwargs)+" ir = "+str(self.irname)
+        return Action.__str__(self, *args, **kwargs) + " ir = " + str(self.irname)
 
     def __init__(self, device, *args):
         super(ActionEmitir, self).__init__(device)
@@ -627,7 +624,7 @@ class ActionEmitir(Action):
                     try:
                         p = float(currentk[1:])
                         time.sleep(p)
-                    except: # noqa: E722
+                    except:  # noqa: E722
                         pass
                     self.idx += 1
                 else:
@@ -658,7 +655,7 @@ class ActionEmitir(Action):
                 else:
                     self.mqtt_publish_key(dev, nm, 2)
                     self.idx += 1
-            except: # noqa: E722
+            except:  # noqa: E722
                 _LOGGER.warning(f"{traceback.format_exc()}")
                 self.idx += 1
         return 2
@@ -691,7 +688,7 @@ class ActionEmitir(Action):
                 nm = convdict[nm]
             if self.device.get_dir(dev, nm):
                 idxbis += 1
-                self.irname.insert(self.idx+idxbis, dev+":"+nm)
+                self.irname.insert(self.idx + idxbis, dev + ":" + nm)
                 idxa += 1
                 if idxa >= len(nma):
                     break
@@ -705,13 +702,14 @@ class ActionEmitir(Action):
                     if (c in convdict) and (not self.device.get_dir(dev, c)):
                         c = convdict[c]
                     if not self.device.get_dir(dev, c):
-                        nma = [c]*x
+                        nma = [c] * x
                         idxa = 0
                         nm = nma[idxa]
                     else:
                         for _ in range(x):
                             idxbis += 1
-                            self.irname.insert(self.idx+idxbis, dev+":"+c)
+                            self.irname.insert(
+                                self.idx + idxbis, dev + ":" + c)
                         break
                 mo = re.search("[^\\s]+ ([0-9]+)$", nm)
                 if mo is not None:
@@ -726,14 +724,16 @@ class ActionEmitir(Action):
                     else:
                         for _ in range(x):
                             idxbis += 1
-                            self.irname.insert(self.idx+idxbis, dev+":"+c)
+                            self.irname.insert(
+                                self.idx + idxbis, dev + ":" + c)
                         break
                 else:
                     mo = re.search("^[0-9]+$", nm)
                     if mo is not None:
                         for _, c in enumerate(nm):
                             idxbis += 1
-                            self.irname.insert(self.idx+idxbis, dev+":"+c)
+                            self.irname.insert(
+                                self.idx + idxbis, dev + ":" + c)
                         idxa += 1
                         if idxa >= len(nma):
                             break
@@ -750,7 +750,8 @@ class ActionEmitir(Action):
                         else:
                             nm = nma[idxa]
         if idxbis >= 0:
-            irc = self.device.get_dir(dev, self.irname[self.idx][len(dev)+1:])
+            irc = self.device.get_dir(
+                dev, self.irname[self.idx][len(dev) + 1:])
         return irc
 
     def mqtt_publish_key(self, remnm, keynm, rv=1):
@@ -766,7 +767,7 @@ class ActionViewtable(Action):
         return self.m_device
 
     def __str__(self, *args, **kwargs):
-        return Action.__str__(self, *args, **kwargs)+" tbl = "+str(self.tablenum)+":"+str(self.vflag)
+        return Action.__str__(self, *args, **kwargs) + " tbl = " + str(self.tablenum) + ":" + str(self.vflag)
 
     def __init__(self, device, tablenum, vflag):
         super(ActionViewtable, self).__init__(device)
@@ -776,7 +777,7 @@ class ActionViewtable(Action):
 
     def to_json(self):
         rv = Action.to_json(self)
-        rv.update({'tbl': str(self.tablenum)+":"+str(self.vflag)})
+        rv.update({'tbl': str(self.tablenum) + ":" + str(self.vflag)})
         return rv
 
 
@@ -808,7 +809,7 @@ class ActionSettable(Action):
         return False
 
     def __str__(self, *args, **kwargs):
-        return Action.__str__(self, *args, **kwargs)+" tbl = "+str(self.tablenum)+":"+str(self.actionid)
+        return Action.__str__(self, *args, **kwargs) + " tbl = " + str(self.tablenum) + ":" + str(self.actionid)
 
     def __init__(self, device, tablenum, actionid):
         super(ActionSettable, self).__init__(device)
@@ -817,7 +818,7 @@ class ActionSettable(Action):
 
     def to_json(self):
         rv = Action.to_json(self)
-        rv.update({'tbl': str(self.tablenum)+":"+str(self.actionid)})
+        rv.update({'tbl': str(self.tablenum) + ":" + str(self.actionid)})
         return rv
 
 
@@ -825,14 +826,14 @@ class ActionSettable3(ActionSettable):
     def __str__(self, *args, **kwargs):
         rv = ActionSettable.__str__(self, *args, **kwargs)
         if self.actionid == DELRECORD_CODE:
-            rv += " cod = "+str(self.timerid)
+            rv += " cod = " + str(self.timerid)
         else:
             rv += " date = " + \
                 self.datetime.strftime(
-                    '%d/%m/%Y %H:%M:%S')+" r = "+str(self.rep)
-            rv += " act = "+str(self.action)
+                    '%d/%m/%Y %H:%M:%S') + " r = " + str(self.rep)
+            rv += " act = " + str(self.action)
             if self.actionid == MODRECORD_CODE:
-                rv += " cod = "+str(self.timerid)
+                rv += " cod = " + str(self.timerid)
         return rv
 
     def __init__(self, device, datev=None, timev=None, rep=0, timerid=0, *args, **kwargs):
@@ -852,13 +853,13 @@ class ActionSettable3(ActionSettable):
         else:
             try:
                 self.datetime = datetime.strptime(
-                    datev+" "+timev, '%d/%m/%Y %H:%M:%S')
-            except: # noqa: E722
+                    datev + " " + timev, '%d/%m/%Y %H:%M:%S')
+            except:  # noqa: E722
                 try:
                     do = int(datev)
                     ho = int(timev)
-                    self.datetime = datetime.now()+timedelta(days=do, seconds=ho)
-                except: # noqa: E722
+                    self.datetime = datetime.now() + timedelta(days=do, seconds=ho)
+                except:  # noqa: E722
                     self.datetime = None
 
         self.rep = 0 if rep is None else int(rep)
@@ -890,7 +891,7 @@ class ActionCleartimers(Action):
         for arg in args:
             try:
                 self.timerid.append(int(arg))
-            except: # noqa: E722
+            except:  # noqa: E722
                 pass
         self.idx = 0
 
@@ -964,12 +965,12 @@ class ActionGetinfo(Action):
                 tablever = getattr(d, "tablever", None)
                 if tablever:
                     dudptot += 1
-                    if now-d.offt > d.offlimit:
+                    if now - d.offt > d.offlimit:
                         if d.tablever:
                             for k, _ in d.tablever.copy().items():
                                 if k != "1":
                                     kls = class_forname(
-                                        'action.ActionViewtable'+k)
+                                        'action.ActionViewtable' + k)
                                     actionexec.insert_action(kls(d), dudpok)
                                     dudpok += 1
                 else:
@@ -993,8 +994,9 @@ class ActionSynctimers(Action):
         self.idx = -1
         try:
             tablever = getattr(device, "tablever", None)
-            self.out = None if not tablever else self.device.loadtables(fn, self.device.name)
-        except: # noqa: E722
+            self.out = None if not tablever else self.device.loadtables(
+                fn, self.device.name)
+        except:  # noqa: E722
             _LOGGER.warning(f"{traceback.format_exc()}")
             self.out = None
 
@@ -1007,7 +1009,7 @@ class ActionSynctimers(Action):
             return 0
         elif self.idx < len(self.out['timers']):
             t = self.out['timers'][self.idx]
-            _LOGGER.info("timer "+str(t))
+            _LOGGER.info("timer " + str(t))
             actionexec.insert_action(ActionSettable3(self.device, *tuple(t['action'].split(' ')),
                                                      datev="%02d/%02d/%04d" % (t['day'],
                                                                                t['month'], t['year']),
@@ -1079,7 +1081,7 @@ class ActionSettable4(ActionSettable):
 
 class ActionSetname(ActionSettable4):
     def __str__(self, *args, **kwargs):
-        return ActionSettable4.__str__(self, *args, **kwargs)+" name = "+self.name
+        return ActionSettable4.__str__(self, *args, **kwargs) + " name = " + self.name
 
     def __init__(self, device, newname):
         super(ActionSetname, self).__init__(device, newname=newname)
@@ -1087,7 +1089,7 @@ class ActionSetname(ActionSettable4):
 
 class ActionSettz(ActionSettable4):
     def __str__(self, *args, **kwargs):
-        return ActionSettable4.__str__(self, *args, **kwargs)+" tz = "+str(self.timezone)
+        return ActionSettable4.__str__(self, *args, **kwargs) + " tz = " + str(self.timezone)
 
     def __init__(self, device, tz):
         super(ActionSettz, self).__init__(device, tz=tz)
@@ -1095,7 +1097,7 @@ class ActionSettz(ActionSettable4):
 
 class ActionSetoao(ActionSettable4):
     def __str__(self, *args, **kwargs):
-        return ActionSettable4.__str__(self, *args, **kwargs)+" oao = "+str(self.timer_off_after_on)
+        return ActionSettable4.__str__(self, *args, **kwargs) + " oao = " + str(self.timer_off_after_on)
 
     def __init__(self, device, offafteron):
         super(ActionSetoao, self).__init__(device, offafteron=offafteron)
@@ -1103,7 +1105,7 @@ class ActionSetoao(ActionSettable4):
 
 class ActionSetip(ActionSettable4):
     def __str__(self, *args, **kwargs):
-        return ActionSettable4.__str__(self, *args, **kwargs)+" ip = "+self.ip+" nm = "+self.nmask+" dg = "+self.gateway
+        return ActionSettable4.__str__(self, *args, **kwargs) + " ip = " + self.ip + " nm = " + self.nmask + " dg = " + self.gateway
 
     def __init__(self, device, ipv, gatewayv, nmaskv):
         super(ActionSetip, self).__init__(

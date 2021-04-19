@@ -16,7 +16,7 @@ class DeviceVirtual(Device):
         for d433 in d433s:
             try:
                 lst.append(d433.childNodes[0].nodeValue)
-            except: # noqa: E722
+            except:  # noqa: E722
                 _LOGGER.warning(f"{traceback.format_exc()}")
                 pass
 
@@ -40,10 +40,10 @@ class DeviceVirtual(Device):
                 for act in self.states_map[action.newstate]:
                     realdev = self.get_real_dev(act)
                     for d in realdev:
-                        randid = 8950+i
+                        randid = 8950 + i
                         i += 1
                         actcmd = "%d statechange %s %s" % (randid, d, act["s"])
-                        _LOGGER.info("Scheduling "+actcmd)
+                        _LOGGER.info("Scheduling " + actcmd)
                         event.EventManager.fire(eventname='ExtInsertAction',
                                                 cmdline=actcmd, action=None)
                 self.state = action.newstate
@@ -63,7 +63,7 @@ class DeviceVirtual(Device):
         elif d == "$lasttargetnone":
             if len(self.state):
                 d2 = self.get_last_target_from_state()
-        _LOGGER.info("D is "+d+" Real Dev is "+str(d2))
+        _LOGGER.info("D is " + d + " Real Dev is " + str(d2))
         return d2
 
     def states_xml_device_node_parse(self, root, lst, nicks):
@@ -73,7 +73,7 @@ class DeviceVirtual(Device):
                 nm = d433.attributes['value'].value
                 try:
                     nicks[nm] = d433.attributes['nick'].value
-                except: # noqa: E722
+                except:  # noqa: E722
                     nicks[nm] = nm
                 acts = d433.getElementsByTagName('action')
                 lst[nm] = []
@@ -85,9 +85,9 @@ class DeviceVirtual(Device):
                         devact.append({
                             "d": dev,
                             "s": stateact})
-                    except: # noqa: E722
+                    except:  # noqa: E722
                         _LOGGER.warning(f"{traceback.format_exc()}")
-            except: # noqa: E722
+            except:  # noqa: E722
                 _LOGGER.warning(f"{traceback.format_exc()}")
                 pass
 

@@ -56,14 +56,15 @@ class SendBufferTimer(object):
     def handle_incoming_data(data, key=PK_KEY):
         try:
             valasci = binascii.crc32(data[42:])
-            _LOGGER.info(f"K={b2s(key)} Computed CRC %08X vs {tohexs(data[6:10])}" % valasci)
+            _LOGGER.info(
+                f"K={b2s(key)} Computed CRC %08X vs {tohexs(data[6:10])}" % valasci)
             if valasci == struct.unpack('>i', data[6:10])[0]:
                 cry = AES.new(s2b(key), AES.MODE_ECB)
                 msg = cry.decrypt(data[42:])
                 _LOGGER.info("Decrypted MSG %s" % b2s(msg))
-                jsono = json.loads(msg[0:msg.rfind(b'}')+1])
+                jsono = json.loads(msg[0:msg.rfind(b'}') + 1])
                 return {'msg': jsono, 'convid': b2s(data[10:42])}
-        except: # noqa: E722
+        except:  # noqa: E722
             _LOGGER.warning(f"{traceback.format_exc()}")
             pass
         return None
@@ -78,11 +79,11 @@ class SendBufferTimer(object):
             if rv is not None:
                 exitv = self.action.device.receive_handler(
                     self.addr, self.action, rv['msg'])
-                _LOGGER.info("exitv = "+str(exitv))
+                _LOGGER.info("exitv = " + str(exitv))
                 if exitv is not None and exitv != RV_DATA_WAIT:
                     self.set_finished(exitv)
             return rv
-        except: # noqa: E722
+        except:  # noqa: E722
             _LOGGER.warning(f"{traceback.format_exc()}")
         return None
 
@@ -91,7 +92,7 @@ class SendBufferTimer(object):
             self.status = SendBufferTimer.ACTION_FAILED
             # self.action.tcpserver.unsetclientinfo(self.addr)
         else:
-            self.clientinfo["disconnecttimer"] = time.time()+3*60
+            self.clientinfo["disconnecttimer"] = time.time() + 3 * 60
             self.status = SendBufferTimer.ACTION_OK
         if self.timer is not None:
             self.timer.cancel()
@@ -118,7 +119,7 @@ class SendBufferTimer(object):
         if self.action is not None and self.timeout is not None and self.timeout > 0:
             self.timer = threading.Timer(self.timeout, self.manage_timeout, ())
             self.timer.start()
-            _LOGGER.info("Scheduling timeouttimer "+str(self.timeout))
+            _LOGGER.info("Scheduling timeouttimer " + str(self.timeout))
         else:
             self.status = SendBufferTimer.ACTION_OK
         return self.get_send_bytes2()
@@ -134,7 +135,7 @@ class SendBufferTimer(object):
             if 'convid' in self.clientinfo:
                 convid = self.clientinfo['convid']
             else:
-                convid = ("\x00")*32
+                convid = ("\x00") * 32
             return SendBufferTimer.get_send_bytes(self.jsono, convid, key, typemsg)
         else:
             return b''
@@ -153,16 +154,16 @@ class SendBufferTimer(object):
             lnmsg = len(msg)
             remain = lnmsg % 16
             if remain > 0:
-                remain = (lnmsg//16)*16+16-lnmsg
-                msg += b"\x20"*remain
-            ln = lnmsg+remain+4+2+2+2+32
+                remain = (lnmsg // 16) * 16 + 16 - lnmsg
+                msg += b"\x20" * remain
+            ln = lnmsg + remain + 4 + 2 + 2 + 2 + 32
             cry = AES.new(s2b(key), AES.MODE_ECB)
             newbytes = cry.encrypt(msg)
             crc32 = binascii.crc32(newbytes)
-            bytesa = MAGIC+struct.pack('>H', ln)+typemsg + \
-                struct.pack('>i', crc32)+s2b(convid)
-            return bytesa+newbytes
-        except: # noqa: E722
+            bytesa = MAGIC + struct.pack('>H', ln) + typemsg + \
+                struct.pack('>i', crc32) + s2b(convid)
+            return bytesa + newbytes
+        except:  # noqa: E722
             _LOGGER.warning(f"{traceback.format_exc()}")
             return b''
 
@@ -219,7 +220,7 @@ class DeviceCT10(IrManager, ManTimerManager):
         if isinstance(action, ActionLearnir):
             if len(action.irdata):
                 fk = action.irdata[action.irdata.find(
-                    ':')+1:].translate(None, '!@#$/\\+-_')
+                    ':') + 1:].translate(None, '!@#$/\\+-_')
                 if len(fk) < 2:
                     fk = generatestring(5)
                 cmd = collections.OrderedDict()
@@ -229,7 +230,7 @@ class DeviceCT10(IrManager, ManTimerManager):
                 cmd['cmd'] = 25
                 cmd['order'] = 'ir control'
                 cmd['lastUpdateTime'] = int(
-                    Device.unix_time_millis(datetime.now())/1000.0)
+                    Device.unix_time_millis(datetime.now()) / 1000.0)
                 cmd['clientSessionId'] = self.clientSessionId
                 cmd['serial'] = None
                 cmd['deviceId'] = self.deviceId
@@ -244,7 +245,7 @@ class DeviceCT10(IrManager, ManTimerManager):
                 cmd['qualityOfService'] = 1
                 cmd['clientSessionId'] = self.clientSessionId
                 cmd.update(action.irdata[2])
-                cmd['pluseNum'] = action.irdata[0].count(',')+1
+                cmd['pluseNum'] = action.irdata[0].count(',') + 1
                 cmd['value1'] = 0
                 cmd['value2'] = 0
                 cmd['value3'] = 0
@@ -276,7 +277,7 @@ class DeviceCT10(IrManager, ManTimerManager):
     def get_from_arduraw(self, msg):
         out = ''
         for h in msg['a']:
-            out += str(h)+","
+            out += str(h) + ","
         return (out[:-1], msg['key'], {'freq': 38000})
 
     def send_action(self, actionexec, action, pay):
@@ -351,10 +352,10 @@ class DeviceCT10(IrManager, ManTimerManager):
                     if len(tpl[1]):
                         f.write(struct.pack("<B", len(tpl[1])))
                         f.write(bytearray(tpl[1], 'utf8'))
-                        arrj = json.loads("["+tpl[0]+"]")
+                        arrj = json.loads("[" + tpl[0] + "]")
                         if len(arrj):
                             f.write(struct.pack("<H", len(arrj)))
-                            f.write(struct.pack("<"+str(len(arrj))+"H", *
+                            f.write(struct.pack("<" + str(len(arrj)) + "H", *
                                                 tuple([(lambda i: 65535 if i > 65535 else i)(i) for i in arrj])))
             f.close()
 
@@ -368,9 +369,9 @@ class DeviceCT10(IrManager, ManTimerManager):
                 f.write(struct.pack("<B", len(d433d)))
                 for x in d433d:
                     idx = x.find(':')
-                    if idx > 0 and idx < len(x)-1:
+                    if idx > 0 and idx < len(x) - 1:
                         remnm = x[0:idx]
-                        keynm = x[idx+1:]
+                        keynm = x[idx + 1:]
                     else:
                         remnm = ""
                         keynm = x

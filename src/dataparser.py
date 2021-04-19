@@ -38,14 +38,16 @@ class RoughParser(object):
                 else:
                     returnv['idxout'] = RoughParser.STILL_WAIT
             else:
-                _LOGGER.info("R ["+hp[0]+":"+str(hp[1])+"] <-"+b2s(data))
+                _LOGGER.info(
+                    "R [" + hp[0] + ":" + str(hp[1]) + "] <-" + b2s(data))
                 event.EventManager.fire(eventname='ExtInsertAction', hp=hp,
                                         cmdline=b2s(data[1:]), action=None)
-                returnv['idxout'] = idx+1
+                returnv['idxout'] = idx + 1
         elif len(data) > 7 and data[0:2] == MAGIC:
             msgid = data[4:6]
             ln = struct.unpack('>H', data[2:4])[0]
-            _LOGGER.info("Detected Magic with ln %d and id %s" % (ln, b2s(msgid)))
+            _LOGGER.info("Detected Magic with ln %d and id %s" %
+                         (ln, b2s(msgid)))
             if len(data) >= ln:
                 returnv['type'] = b'cry' if msgid == PK_MSG_ID or msgid == DK_MSG_ID else b'orv'
                 returnv['idxout'] = ln
@@ -65,9 +67,11 @@ class RoughParser(object):
                             returnv['key'] = dictout['key']
                 elif msgid == DK_MSG_ID:
                     if 'sender' in clinfo:
-                        outv = clinfo['sender'].handle_incoming_data2(contentmsg)
+                        outv = clinfo['sender'].handle_incoming_data2(
+                            contentmsg)
                     else:
-                        outv = SendBufferTimer.handle_incoming_data(contentmsg, returnv['key'])
+                        outv = SendBufferTimer.handle_incoming_data(
+                            contentmsg, returnv['key'])
                     if outv is not None:
                         obj = outv['msg']
                         if obj['cmd'] == 6:
@@ -84,11 +88,12 @@ class RoughParser(object):
                             dev = DeviceCT10(hp=hp,
                                              mac=returnv['mac'],
                                              name=returnv['name'] +
-                                             '_'+obj['uid'],
+                                             '_' + obj['uid'],
                                              key=returnv['key'],
                                              password=obj['password'],
                                              deviceid=generatestring(32),
-                                             clientsessionid=generatestring(32),
+                                             clientsessionid=generatestring(
+                                                 32),
                                              hp2=(obj['localIp'], obj['localPort']))
                             returnv['device'] = dev
                             act = ActionDiscovery()
@@ -100,12 +105,12 @@ class RoughParser(object):
                                        'cmd': obj['cmd'], 'status': 0, 'uid': obj['uid']}
                             returnv['reply'] = SendBufferTimer.get_send_bytes(
                                 dictout, outv['convid'], key=returnv['key'], typemsg=b"dk")
-                            returnv['disconnecttimer'] = time.time()+3*60
+                            returnv['disconnecttimer'] = time.time() + 3 * 60
                 else:
                     if msgid == STATECHANGE_EXT_ID or msgid == DISCOVERY_ID:
                         event.EventManager.fire(eventname='ExtChangeState', hp=hp, mac=DeviceUDP.mac_from_data(
                             data), newstate="1" if data[-1:] == b'\x01' else "0")
-                    rx = re.compile(MAGIC+b'(.{2}).{2}.*'+MAC_START)
+                    rx = re.compile(MAGIC + b'(.{2}).{2}.*' + MAC_START)
                     control = {}
                     off = 0
                     while True:
@@ -114,15 +119,17 @@ class RoughParser(object):
                             st = m.start()
                             ln = struct.unpack('>H', m.group(1))[0]
                             # _LOGGER.info("st = {} ln = {}".format(st,ln))
-                            off = st+ln
+                            off = st + ln
                             if off <= len(data):
                                 sect = data[st:off]
                                 data = data[off:]
                                 keyv = DeviceUDP.keyfind(hp, sect)
                                 if keyv not in control:
                                     control[keyv] = 1
-                                    event.EventManager.fire(eventname='RawDataReceived', key=keyv, hp=hp, data=sect)
-                                    _LOGGER.info("R ["+keyv+"] <-"+tohexs(sect))
+                                    event.EventManager.fire(
+                                        eventname='RawDataReceived', key=keyv, hp=hp, data=sect)
+                                    _LOGGER.info(
+                                        "R [" + keyv + "] <-" + tohexs(sect))
                             else:
                                 break
                         else:

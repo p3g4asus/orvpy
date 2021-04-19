@@ -3,7 +3,7 @@ import traceback
 import threading
 import logging
 from util import init_logger, tohexs, s2b, uunq
-from parser import RoughParser
+from dataparser import RoughParser
 import select
 import socket
 import time
@@ -45,14 +45,14 @@ class TCPServerHandler(SocketServer.BaseRequestHandler):
             try:
                 self.request.close()
                 self.request = None
-            except: # noqa: E722
+            except:  # noqa: E722
                 _LOGGER.warning(f"{traceback.format_exc()}")
 
     def handle(self):
         self.stopped = False
         keyv = '{}:{}'.format(*self.client_address)
         threading.currentThread().name = ("TCPServerHandler")
-        _LOGGER.info(keyv+" connected")
+        _LOGGER.info(keyv + " connected")
         self.request.setblocking(0)
         olddata = b''
         serv = self.server.s
@@ -69,8 +69,9 @@ class TCPServerHandler(SocketServer.BaseRequestHandler):
                 if ready[0]:
                     data = self.request.recv(4096)
                     if len(data) > 0:
-                        _LOGGER.info("RTCP ["+keyv+"/"+str(len(data))+"] <-"+tohexs(data))
-                        data = olddata+data
+                        _LOGGER.info(
+                            "RTCP [" + keyv + "/" + str(len(data)) + "] <-" + tohexs(data))
+                        data = olddata + data
                         while True:
                             dictout = parser.parse(
                                 serv.getclientinfo(self.client_address), data)
@@ -99,7 +100,8 @@ class TCPServerHandler(SocketServer.BaseRequestHandler):
                     if len(remain) == 0:
                         remain = serv.dowrite(self.client_address)
                     if len(remain) > 0:
-                        _LOGGER.info("Sending packet to %s:%d" % self.client_address)
+                        _LOGGER.info("Sending packet to %s:%d" %
+                                     self.client_address)
                         nb = self.request.send(remain)
                         _LOGGER.info("Sent")
                         # if tp=="cry":
@@ -108,12 +110,12 @@ class TCPServerHandler(SocketServer.BaseRequestHandler):
                         wlist = [self.request]
                     else:
                         wlist = []
-            except: # noqa: E722
+            except:  # noqa: E722
                 _LOGGER.warning(f"{traceback.format_exc()}")
                 break
-        _LOGGER.info(keyv+" DISCONNECTED")
+        _LOGGER.info(keyv + " DISCONNECTED")
         serv.unsetclientinfo(self.client_address)
-        _LOGGER.info(keyv+" DELETED")
+        _LOGGER.info(keyv + " DELETED")
         self.stop()
 
 
@@ -150,7 +152,7 @@ class TCPClient(EthSender):
             sock.sendall(bytearray(packet))
             sock.close()
             return len(packet)
-        except: # noqa: E722
+        except:  # noqa: E722
             _LOGGER.warning(f"{traceback.format_exc()}")
             return -1
 
@@ -172,7 +174,8 @@ class HTTPServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         self.request.settimeout(60)
 
     def log(self, msg):
-        _LOGGER.info(f"[{self.__class__.__name__}] ({self.client_address[0]}:{self.client_address[1]}) -> {msg}")
+        _LOGGER.info(
+            f"[{self.__class__.__name__}] ({self.client_address[0]}:{self.client_address[1]}) -> {msg}")
 
     def schedule_response(self, randid, action, **kwargs):
         self.log("action parsed")
@@ -258,7 +261,7 @@ class HTTPServer(threading.Thread):
                 self.server = SocketServer.ThreadingTCPServer(
                     ("0.0.0.0", self.port), HTTPServerHandler)
                 break
-            except: # noqa: E722
+            except:  # noqa: E722
                 _LOGGER.warning(f"{traceback.format_exc()}")
                 time.sleep(5)
         if self.server is not None:
@@ -359,7 +362,7 @@ class TCPServer(threading.Thread):
         if isinstance(action, ActionPing) and self.timer is not None:
             self.timer_ping_init()
         threading.currentThread().name = ("handle_action_done")
-        strout = json.dumps({'action': action, 'retval': retval})+'\n'
+        strout = json.dumps({'action': action, 'retval': retval}) + '\n'
         if device is not None and action is not None:
             lst = action.mqtt_publish_onfinish(retval)
             lst.extend(device.mqtt_publish_onfinish(action, retval))
@@ -384,7 +387,7 @@ class TCPServer(threading.Thread):
                 self.server = SocketServer.ThreadingTCPServer(
                     ("0.0.0.0", self.port), TCPServerHandler)
                 break
-            except: # noqa: E722
+            except:  # noqa: E722
                 _LOGGER.warning(f"{traceback.format_exc()}")
                 time.sleep(5)
         if self.server is not None:
@@ -475,7 +478,7 @@ class ListenerTh(threading.Thread, EthSender):
     def send_packet(self, addr, packet):
         try:
             return self.socket.sendto(bytearray(packet), addr)
-        except: # noqa: E722
+        except:  # noqa: E722
             _LOGGER.warning(f"{traceback.format_exc()}")
             return -1
 
@@ -511,14 +514,16 @@ class ListenerTh(threading.Thread, EthSender):
                 try:
                     _LOGGER.info('enterrecv')
                     data, addr = self.socket.recvfrom(1024)
-                    _LOGGER.info('1) recv %d (%s:%d) ' % (0 if not data else len(data), 'unkn' if not addr else addr[0], 0 if not addr else addr[1]))
+                    _LOGGER.info('1) recv %d (%s:%d) ' % (0 if not data else len(
+                        data), 'unkn' if not addr else addr[0], 0 if not addr else addr[1]))
                     if data is not None and len(data):
-                        self.preparse.parse(addr, data if data[0:1] != b'@' else data+b'\n')['idxout']
+                        self.preparse.parse(
+                            addr, data if data[0:1] != b'@' else data + b'\n')['idxout']
                     _LOGGER.info('exitrecv')
-                except: # noqa: E722
+                except:  # noqa: E722
                     _LOGGER.warning(f"{traceback.format_exc()}")
                     break
-        except: # noqa: E722
+        except:  # noqa: E722
             _LOGGER.warning(f"{traceback.format_exc()}")
         self.stopped_ev.set()
 
@@ -576,7 +581,7 @@ class UdpManager(object):
                 try:
                     self.sender.send_packet(hp2, payload)
                     _LOGGER.info(f"S [{hp[0]}:{hp[1]}] -> {tohexs(payload)}")
-                except: # noqa: E722
+                except:  # noqa: E722
                     _LOGGER.warning(f"{traceback.format_exc()}")
                     return None
             if handler is None:
@@ -593,7 +598,7 @@ class UdpManager(object):
                 if buffcont is None:
                     now = time.time()
                     once = False
-                    while time.time() < now+timeout or not once:
+                    while time.time() < now + timeout or not once:
                         # _LOGGER.info("waiting")
                         u.buffer_l.wait(timeout)
                         # _LOGGER.info("waiting f")

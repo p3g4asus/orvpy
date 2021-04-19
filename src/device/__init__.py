@@ -54,16 +54,16 @@ class Device(object):
             try:
                 self.mqtt_client.loop_stop()
                 self.mqtt_client.disconnect()
-            except: # noqa: E722
+            except:  # noqa: E722
                 _LOGGER.warning(f"{traceback.format_exc()}")
 
     def mqtt_topic(self, prefix, suffix):
-        return str(prefix+'/'+self.__class__.__name__[6:].lower()+"/"+self.name+"/"+suffix)
+        return str(prefix + '/' + self.__class__.__name__[6:].lower() + "/" + self.name + "/" + suffix)
 
     def mqtt_sub(self, topic):
         i = topic.rfind("/")
-        if i >= 0 and i < len(topic)-1:
-            return topic[i+1:]
+        if i >= 0 and i < len(topic) - 1:
+            return topic[i + 1:]
         else:
             return ""
 
@@ -74,26 +74,29 @@ class Device(object):
         return []  # lista di dict con topic msg e options(retain, qos)
 
     def mqtt_on_subscribe(self, client, userdata, mid, granted_qos):
-        _LOGGER.info(self.name+" subscribed: "+str(mid)+" "+str(granted_qos))
+        _LOGGER.info(self.name + " subscribed: " +
+                     str(mid) + " " + str(granted_qos))
 
     def mqtt_on_publish(self, client, userdata, mid):
-        _LOGGER.info(self.name+" pub mid: "+str(mid))
+        _LOGGER.info(self.name + " pub mid: " + str(mid))
 
     def mqtt_on_connect(self, client, userdata, flags, rc):
-        _LOGGER.info(self.name+" CONNACK received with code %d." % (rc))
+        _LOGGER.info(self.name + " CONNACK received with code %d." % (rc))
         self.mqtt_publish_all(self.mqtt_publish_onstart())
         lsttopic = self.mqtt_subscribe_topics()
         client.subscribe(lsttopic)
 
     def mqtt_on_message(self, client, userdata, msg):
-        _LOGGER.info(f"{self.name} MSG {msg.topic} ({msg.qos})-> {b2s(msg.payload)}")
+        _LOGGER.info(
+            f"{self.name} MSG {msg.topic} ({msg.qos})-> {b2s(msg.payload)}")
 
     def mqtt_publish_all(self, lsttopic):
         if self.mqtt_client:
             for p in lsttopic:
                 retain = p["options"].get('retain', False)
                 if not retain or self.mqtt_topic_retain.get(p["topic"], None) != p["msg"]:
-                    self.mqtt_client.publish(p["topic"], p["msg"], **p["options"])
+                    self.mqtt_client.publish(
+                        p["topic"], p["msg"], **p["options"])
                     if retain:
                         self.mqtt_topic_retain[p["topic"]] = p["msg"]
 
@@ -141,7 +144,7 @@ class Device(object):
                 if clname in classes:
                     dev = classes[clname](root=item)
                     devices[dev.name] = dev
-            except: # noqa: E722
+            except:  # noqa: E722
                 _LOGGER.warning(f"{traceback.format_exc()}")
                 pass
         _LOGGER.info(f"Device number is {len(devices)}")
@@ -194,7 +197,7 @@ class Device(object):
         timeString  = time.strftime("%Y%m%d %H%M%S", localtime)
         return self.host+"("+self.__class__.__name__+": "+self.name+");"+self.mac+";"+timeString
         """
-        return self.__class__.__name__+"("+self.name+")"
+        return self.__class__.__name__ + "(" + self.name + ")"
 
     @staticmethod
     def xml_prettify(elem):
@@ -205,7 +208,7 @@ class Device(object):
         return reparsed.toprettyxml(indent="  ")
 
     def default_name(self):
-        return 'dev_'+tohexs(self.mac)
+        return 'dev_' + tohexs(self.mac)
 
     def __init__(self, hp=('', 0), mac='', root=None, name='', **kw):
         if root is None:
@@ -221,7 +224,7 @@ class Device(object):
             self.name = root.attributes['name'].value
             try:
                 self.offlimit = int(root.attributes['offlimit'].value)
-            except: # noqa: E722
+            except:  # noqa: E722
                 _LOGGER.warning(f"{traceback.format_exc()}")
                 self.offlimit = 60
         self.timers = None

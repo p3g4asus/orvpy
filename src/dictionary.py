@@ -33,8 +33,8 @@ def dictionary_parse(root):
                     irc = ir.childNodes[0].nodeValue
                     if len(irc):
                         terms.append(irc)
-            except: # noqa: E722
+            except:  # noqa: E722
                 _LOGGER.warning(f"{traceback.format_exc()}")
-    except: # noqa: E722
+    except:  # noqa: E722
         _LOGGER.warning(f"{traceback.format_exc()}")
     return DICTIONARY

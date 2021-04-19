@@ -26,6 +26,8 @@ class ActionExecutor(threading.Thread):
         self.prime_code = ''
         self.prime_pass = ''
         self.prime_port2 = 0
+        self.mqtt_host = ''
+        self.mqtt_port = 0
         self.name = ("ActionExecutor")
 
     def configure(self, options):
@@ -33,6 +35,8 @@ class ActionExecutor(threading.Thread):
         self.prime_code = options.prime_code
         self.prime_pass = options.prime_pass
         self.prime_port2 = options.prime_port2
+        self.mqtt_host = options.mqtt_host
+        self.mqtt_port = options.mqtt_port
         if self.action_list_l is None:
             self.action_list_l = threading.Condition()
             self.asynch_action_l = threading.Condition()
@@ -118,11 +122,13 @@ class ActionExecutor(threading.Thread):
                     act = None
                 self.action_list_l.release()
                 if act is not None:
-                    _LOGGER.info(f"Running action {act} dev={None if not act.device else id(act.device)}")
+                    _LOGGER.info(
+                        f"Running action {act} dev={None if not act.device else id(act.device)}")
                     retval = act.run(self)
                     if retval == RV_ASYNCH_EXEC:
                         retval = self.wait_asynch_action_done(act)
-                    _LOGGER.info("Action "+str(act)+" run ("+str(retval)+")")
+                    _LOGGER.info("Action " + str(act) +
+                                 " run (" + str(retval) + ")")
                     if retval is None or retval > 0:
                         self.action_list_l.acquire()
                         if self.stopped:

@@ -373,14 +373,22 @@
       </dirs>
       <shs>
         <sh name="2sky">
-          <ir>samsung:av</ir>
-          <ir>samsung:right</ir>
-          <ir>samsung:right</ir>
+          <ir>sottotveth:sam:HDMI2</ir>
           <ir>sky:sky</ir>
+          <ir>$3</ir>
+          <ir>sky:exit</ir>
         </sh>
         <sh name="2tv">
           <ir>samsung:av</ir>
           <ir>samsung:left</ir>
+        </sh>
+        <sh name="tvsamsungterraon2">
+          <ir>sky:sky</ir>
+          <ir>samsung:power</ir>
+          <ir>$10</ir>
+          <ir>sottotveth:sam:HDMI2</ir>
+          <ir>sky:exit</ir>
+          <ir>sky:5001</ir>
         </sh>
         <sh name="s_100_Sky_TG_24_HD">
           <ir>sky:100</ir>
@@ -4101,6 +4109,7 @@
           <ir>blackbeam1:samsung:power</ir>
           <ir>$10</ir>
           <ir>sam:HDMI2</ir>
+          <ir>blackbeam1:sky:exit</ir>
         </sh>
       </shs>
       <timers/>

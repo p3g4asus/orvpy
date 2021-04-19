@@ -31,7 +31,7 @@ class IrManager(Device):
                     ed = float(root.attributes['emit_delay'].value)
                     if ed > 0:
                         self.emit_ir_delay = ed
-                except: # noqa: E722
+                except:  # noqa: E722
                     pass
             self.ir_xml_device_node_parse(root, self.d433, "d433")
             self.ir_xml_device_node_parse(root, self.dir, "dir")
@@ -90,7 +90,7 @@ class IrManager(Device):
                 tpl = d433d[irnm]
                 if len(tpl[1]):
                     idx += 1
-                    if idx == self.backupstate+1:
+                    if idx == self.backupstate + 1:
                         self.backupstate += 1
                         try:
                             attrib = {'remote': nm, 'key': tpl[1]}
@@ -102,15 +102,15 @@ class IrManager(Device):
                                 2, self.schedule_action, [topic, convert])
                             self.backuptimer.start()
                             return [attrib]
-                        except: # noqa: E722
+                        except:  # noqa: E722
                             _LOGGER.warning(f"{traceback.format_exc()}")
         lst2 = sorted(self.sh, key=cmp_to_key(IrManager.sh_comparer))
         for nm in lst2:
             d433l = self.sh[nm]
             idx += 1
-            if idx == self.backupstate+1:
+            if idx == self.backupstate + 1:
                 self.backupstate += 1
-                outl = [{'remote': '', 'key': '@'+nm}]
+                outl = [{'remote': '', 'key': '@' + nm}]
                 for irc in d433l:
                     remkey = irc.split(':')
                     if len(remkey) == 1:
@@ -161,7 +161,7 @@ class IrManager(Device):
         for nm in lst2:
             d433l = lst[nm]
             for ir in d433l:
-                out.append("@"+nm+":"+ir)
+                out.append("@" + nm + ":" + ir)
 #         for nm,d433l in lst.copy().items():
 #             for ir in d433l:
 #                 out.append(nm+":"+ir)
@@ -176,7 +176,7 @@ class IrManager(Device):
             for irnm in lst3:
                 tpl = d433d[irnm]
                 if len(tpl[1]):
-                    out.append(nm+":"+irnm+":"+self.ir_encode(tpl[0]))
+                    out.append(nm + ":" + irnm + ":" + self.ir_encode(tpl[0]))
 #         for nm,d433d in lst.copy().items():
 #             for irnm,irc in d433d.copy().items():
 #                 out.append(nm+":"+irnm+":"+irc.encode('hex'))
@@ -221,9 +221,9 @@ class IrManager(Device):
                                     if len(x):
                                         lst[nm].update(
                                             {x: (ircdec, '', iratt)})
-                    except: # noqa: E722
+                    except:  # noqa: E722
                         pass
-            except: # noqa: E722
+            except:  # noqa: E722
                 pass
 
     def sh_xml_device_node_parse(self, root, lst, dname):
@@ -239,13 +239,13 @@ class IrManager(Device):
                         irc = ir.childNodes[0].nodeValue
                         if len(nm) and len(irc):
                             lst[nm].append(irc)
-                    except: # noqa: E722
+                    except:  # noqa: E722
                         pass
-            except: # noqa: E722
+            except:  # noqa: E722
                 pass
 
     def ir_xml_device_node_write(self, root, lst, dname):
-        d433s = SubElement(root, dname+"s", {})
+        d433s = SubElement(root, dname + "s", {})
         lst2 = sorted(lst)
         for nm in lst2:
             d433 = SubElement(d433s, dname, {'name': nm})
@@ -270,7 +270,7 @@ class IrManager(Device):
         v1 = re.search("^[@]?([a-z])_([0-9]+)_(.*)", it1)
         v2 = re.search("^[@]?([a-z])_([0-9]+)_(.*)", it2)
         if v1 is not None and v2 is not None and v1.group(1) == v2.group(1):
-            return int(v1.group(2))-int(v2.group(2))
+            return int(v1.group(2)) - int(v2.group(2))
         elif it1 > it2:
             return 1
         elif it2 > it1:
@@ -279,7 +279,7 @@ class IrManager(Device):
             return 0
 
     def sh_xml_device_node_write(self, root, lst, dname):
-        d433s = SubElement(root, dname+"s", {})
+        d433s = SubElement(root, dname + "s", {})
         lst2 = sorted(lst, key=cmp_to_key(IrManager.sh_comparer))
         for nm in lst2:
             d433 = SubElement(d433s, dname, {'name': nm})
@@ -329,7 +329,7 @@ class IrManager(Device):
                 if len(msg.payload):
                     try:
                         out = json.loads(msg.payload)
-                    except: # noqa: E722
+                    except:  # noqa: E722
                         out = msg.payload
                     if isinstance(out, dict):
                         topic = out["topic"]
@@ -341,12 +341,13 @@ class IrManager(Device):
                     event.EventManager.fire(eventname='ExtInsertAction', hp=(self.host, self.port), cmdline="",
                                             action=ActionBackup(self, topic, convert))
             elif sub == "learn" or sub == "emit":
-                _LOGGER.info("topic "+msg.topic+" ["+b2s(msg.payload)+"]")
+                _LOGGER.info("topic " + msg.topic +
+                             " [" + b2s(msg.payload) + "]")
                 learnk = json.loads(msg.payload)
                 keyall = []
                 for d in learnk:
                     ksing = ('' if d['key'][0] == '@' or d['key'][0]
-                             == '$' else (d["remote"]+':'))+d["key"]
+                             == '$' else (d["remote"] + ':')) + d["key"]
                     # _LOGGER.info("KSING "+ksing+" "+str(type(ksing)))
                     if 'a' in d and 'remote' in d and len(d['remote']):
                         event.EventManager.fire(eventname='ExtInsertAction', hp=(self.host, self.port), cmdline="",
@@ -365,5 +366,5 @@ class IrManager(Device):
                         action = ActionEmitir(self, *tall)
                     event.EventManager.fire(eventname='ExtInsertAction', hp=(self.host, self.port), cmdline="",
                                             action=action)
-        except: # noqa: E722
+        except:  # noqa: E722
             _LOGGER.warning(f"{traceback.format_exc()}")

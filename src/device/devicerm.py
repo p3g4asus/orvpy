@@ -21,7 +21,7 @@ class DeviceRM(IrManager, ManTimerManager):
                 (self.host, self.port), bytearray(self.mac), 0x27c2)
             if not self.inner.auth():
                 self.inner = None
-        except: # noqa: E722
+        except:  # noqa: E722
             _LOGGER.warning(f"{traceback.format_exc()}")
             self.inner = None
 
@@ -96,18 +96,20 @@ class DeviceRM(IrManager, ManTimerManager):
                                 freq = 0
                             data = {'irc': data2, 'attrs': {'freq': freq}}
                 else:
-                    _LOGGER.info(f"S({self.inner.host[0]}:{self.inner.host[1]})-> {tohexs(pay[0])}")
+                    _LOGGER.info(
+                        f"S({self.inner.host[0]}:{self.inner.host[1]})-> {tohexs(pay[0])}")
                     response = self.inner.send_data(pay[0])
                     if response is None:
                         rv = None
                     else:
                         rv = response[0x22] | (response[0x23] << 8)
-            except: # noqa: E722
+            except:  # noqa: E722
                 _LOGGER.warning(f"{traceback.format_exc()}")
                 rv = None
             if rv is None or rv != 0:
                 # Forzo futura riconnessione
-                _LOGGER.info("Blackbeam %s error: will try to reconnect" % self.name)
+                _LOGGER.info(
+                    "Blackbeam %s error: will try to reconnect" % self.name)
                 self.inner = None
                 if rv is not None:
                     rv += 600

@@ -57,14 +57,14 @@ class DeviceSamsungCtl(IrManager, ManTimerManager):
         if self.remote is not None:
             try:
                 self.remote.close()
-            except: # noqa: E722
+            except:  # noqa: E722
                 pass
             self.remote = None
 
     def init_device(self):
         now = time.time()
 
-        if self.remote is None or now-self.last_init >= 60:
+        if self.remote is None or now - self.last_init >= 60:
             try:
                 self.last_init = now
                 self.destroy_device()
@@ -75,7 +75,7 @@ class DeviceSamsungCtl(IrManager, ManTimerManager):
                 self.remote = samsungctl.Remote(self.config)
                 if not self.remote.open():
                     self.destroy_device()
-            except: # noqa: E722
+            except:  # noqa: E722
                 _LOGGER.warning(f"{traceback.format_exc()}")
                 self.destroy_device()
 
@@ -113,13 +113,13 @@ class DeviceSamsungCtl(IrManager, ManTimerManager):
         if isinstance(action, ActionEmitir):
             try:
                 if self.init_device():
-                    _LOGGER.info(self.name+" sending "+pay[0])
+                    _LOGGER.info(self.name + " sending " + pay[0])
                     if not self.remote.control(pay[0]):
                         rv = 5
                         self.destroy_device()
                     else:
                         rv = 1
-            except: # noqa: E722
+            except:  # noqa: E722
                 _LOGGER.warning(f"{traceback.format_exc()}")
                 self.destroy_device()
                 rv = None
