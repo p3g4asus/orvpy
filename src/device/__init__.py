@@ -2,6 +2,7 @@ import glob
 import importlib
 import inspect
 import logging
+import re
 import sys
 import traceback
 from datetime import datetime
@@ -10,7 +11,6 @@ from xml.dom import minidom
 from xml.etree import ElementTree
 from xml.etree.ElementTree import Element, SubElement
 
-import paho.mqtt.client as paho
 from device.mantimermanager import ManTimerManager
 from dictionary import dictionary_parse, dictionary_write
 from util import b2s, bfromhex, init_logger, s2b, tohexs
@@ -45,50 +45,48 @@ class Device(object):
     def parse_action_timer_args(self, args):
         return ' '.join(args)
 
-    def mqtt_set_broker(self, hp):
-        self.mqtt_stop()
-        self.mqtt_start(hp)
-
     def mqtt_stop(self):
-        if self.mqtt_client is not None:
-            try:
-                self.mqtt_client.loop_stop()
-                self.mqtt_client.disconnect()
-            except:  # noqa: E722
-                _LOGGER.warning(f"{traceback.format_exc()}")
+        if self.mqtt_client:
+            for topic, _ in self.mqtt_subscribe_topics():
+                self.mqtt_client.unsubscribe(topic)
 
     def mqtt_topic(self, prefix, suffix):
         return str(prefix + '/' + self.__class__.__name__[6:].lower() + "/" + self.name + "/" + suffix)
 
     def mqtt_sub(self, topic):
-        i = topic.rfind("/")
-        if i >= 0 and i < len(topic) - 1:
-            return topic[i + 1:]
-        else:
-            return ""
+        mo = re.search(r"^[^/]+/" + self.__class__.__name__[6:].lower() + "/" + self.name + r"/([^/]+)$", topic)
+        return mo.group(1) if mo else ''
 
     def mqtt_subscribe_topics(self):
-        return [(self.mqtt_topic("cmnd", "#"), 0,)]
+        return []
 
     def mqtt_publish_onstart(self):
         return []  # lista di dict con topic msg e options(retain, qos)
 
     def mqtt_on_subscribe(self, client, userdata, mid, granted_qos):
-        _LOGGER.info(self.name + " subscribed: " +
-                     str(mid) + " " + str(granted_qos) + f" ud = {userdata}")
+        if userdata and userdata.subscriptions and userdata.subscriptions[0] == self.mac:
+            del userdata.subscriptions[0]
+            _LOGGER.info(self.name + " subscribed: " +
+                         str(mid) + " " + str(granted_qos))
 
     def mqtt_on_publish(self, client, userdata, mid):
         _LOGGER.info(self.name + " pub mid: " + str(mid))
 
+    def mqtt_userdata_set(self):
+        if self.mqtt_userdata:
+            self.mqtt_userdata.subscriptions.append(self.mac)
+
     def mqtt_on_connect(self, client, userdata, flags, rc):
         _LOGGER.info(self.name + " CONNACK received with code %d." % (rc))
         self.mqtt_publish_all(self.mqtt_publish_onstart())
+        self.mqtt_userdata_set()
         lsttopic = self.mqtt_subscribe_topics()
         client.subscribe(lsttopic)
 
     def mqtt_on_message(self, client, userdata, msg):
-        _LOGGER.info(
-            f"{self.name} MSG {msg.topic} ({msg.qos})-> {b2s(msg.payload)}")
+        if msg.topic.startswith(f"cmnd/{self.__class__.__name__[6:].lower()}/{self.name}/") or self.mqtt_subscribe_topics():
+            _LOGGER.info(
+                f"{self.name} MSG {msg.topic} ({msg.qos})-> {b2s(msg.payload)}")
 
     def mqtt_publish_all(self, lsttopic):
         if self.mqtt_client:
@@ -100,17 +98,10 @@ class Device(object):
                     if retain:
                         self.mqtt_topic_retain[p["topic"]] = p["msg"]
 
-    def mqtt_start(self, hp):
-        if hp is not None and self.mqtt_client is None:
-            client = paho.Client()
-            client.on_publish = self.mqtt_on_publish
-            client.on_connect = self.mqtt_on_connect
-            client.on_subscribe = self.mqtt_on_subscribe
-            client.on_message = self.mqtt_on_message
-            _LOGGER.info(f"{self.name} mqtt_start ({hp[0]}:{hp[1]})")
-            client.connect_async(hp[0], port=hp[1])
-            client.loop_start()
-            self.mqtt_client = client
+    def mqtt_start(self, client, userdata):
+        self.mqtt_client = client
+        self.mqtt_userdata = userdata
+        self.mqtt_on_connect(client, userdata, 0, 0)
 
     def __eq__(self, other):
         """Override the default Equals behavior"""
@@ -168,7 +159,7 @@ class Device(object):
         return ''
 
     def on_stop(self):
-        self.mqtt_stop()
+        pass
 
     @staticmethod
     def __save(save_devices, save_filename, flag=0):
@@ -230,6 +221,7 @@ class Device(object):
         self.timers = None
         self.offt = 0
         self.mqtt_client = None
+        self.mqtt_userdata = None
         self.mqtt_topic_retain = dict()
 
     def copy_extra_from(self, already_saved_device):

@@ -39,12 +39,15 @@ class DeviceRM(IrManager, ManTimerManager):
         dev3 = broadlink.discover(
             timeout=timeout, timeout2=actionexec.udpmanager.timeout if actionexec.udpmanager.timeout > 0 else None)
         for d in dev3:
-            if d.auth():
-                keyv = '{}:{}'.format(*d.host)
-                hosts[keyv] = DeviceRM(
-                    hp=d.host,
-                    mac=str(d.mac),
-                    root=None, name='', inner=d)
+            try:
+                if d.auth():
+                    keyv = '{}:{}'.format(*d.host)
+                    hosts[keyv] = DeviceRM(
+                        hp=d.host,
+                        mac=str(d.mac),
+                        root=None, name='', inner=d)
+            except Exception:
+                _LOGGER.warning(f"{traceback.format_exc()}")
         return hosts
 
     def __init__(self, hp=('', 0), mac='', root=None, name='', inner=None):

@@ -38,7 +38,7 @@ from device.deviceudp import DeviceS20
 from device.irmanager import IrManager
 from event import EventManager
 from executor import ActionExecutor
-from util import class_forname, init_logger
+from util import class_forname, init_logger, b2s
 
 __all__ = []
 __version__ = 0.1
@@ -294,7 +294,7 @@ USAGE
             for _, dv in devices.copy().items():
                 dv.connect_devices(devices)
 
-        def add_discovered_devices(action, devices, mqtt_host, mqtt_port, emit_delay, **kwargs):
+        def add_discovered_devices(action, devices, mqtt_client, mqtt_userdata, emit_delay, **kwargs):
             for _, v in action.hosts.copy().items():
                 # _LOGGER.info("current "+k+" nm "+v.name+" lndv "+str(len(devices)))
                 already_saved_device = None
@@ -317,8 +317,8 @@ USAGE
                     if isinstance(v, IrManager):
                         v.set_emit_delay(emit_delay)
                     devices.update({already_saved_device.name: v})
-                if len(mqtt_host):
-                    v.mqtt_start((mqtt_host, mqtt_port))
+                if mqtt_client and mqtt_client.is_connected():
+                    v.mqtt_start(mqtt_client, mqtt_userdata)
             connect_devices(devices)
 
         def save_modified_devices(save_filename, save_devices, debug, device, action, **kwargs):
@@ -379,33 +379,70 @@ USAGE
 
         def process_state_change(hp, newstate, devices, mac, actionexec, **kwargs):
             _LOGGER.info(f'ExtStateChange {mac}')
-            for _, dv in devices.copy().items():
+            for _, dv in devices.items():
                 if mac == dv.mac:
                     act = ActionNotifystate(dv, newstate)
                     actionexec.insert_action(act, 1)
 
         def mqtt_on_connect(client, userdata, flags, rc):
-            client.subscribe([("cmnd/#", 0,)])
+            if userdata.subscriptions is None and not rc:
+                _LOGGER.info("__main_. connect")
+                userdata.subscriptions = ["__main__"]
+                client.subscribe([("cmnd/#", 0,)])
+                for _, d in userdata.devices.items():
+                    d.mqtt_start(client, userdata)
+            elif rc:
+                userdata.subscriptions = None
+                client.connect_async(userdata.mqtt_host, port=userdata.mqtt_port)
+                _LOGGER.info(f"Connack {rc}")
+            else:
+                _LOGGER.info(f"Ignoring connack rc {rc}")
+
+        def mqtt_on_subscribe(client, userdata, mid, granted_qos):
+            if userdata and userdata.subscriptions and userdata.subscriptions[0] == "__main__":
+                del userdata.subscriptions[0]
+                _LOGGER.info("__main__ subscribed: " +
+                             str(mid) + " " + str(granted_qos))
+            else:
+                for _, d in userdata.devices.items():
+                    d.mqtt_on_subscribe(client, userdata, mid, granted_qos)
 
         def mqtt_on_message(client, userdata, msg):
             topic = msg.topic
+            _LOGGER.info(f"Received {b2s(msg.topic)}, pay {b2s(msg.payload)}")
             i = topic.rfind("/")
             if i >= 0 and i < len(topic) - 1:
                 sub = topic[i + 1:]
                 if sub == "devicedl":
                     resp = json.dumps(userdata.devices)
                     client.publish("stat/devicedl", resp)
+                else:
+                    for _, d in userdata.devices.items():
+                        d.mqtt_on_message(client, userdata, msg)
+
+        def mqtt_on_publish(client, userdata, mid):
+            _LOGGER.info("Someone pub mid: " + str(mid))
+
+        def mqtt_on_disconnect(client, userdata, rc):
+            _LOGGER.info("disconnect with rc: " + str(rc))
+            if rc == 3:
+                mqtt_on_connect(client, userdata, 0, 456)
 
         def mqtt_init(hp, ud):
-            client = paho.Client(userdata=ud)
+            ud.subscriptions = None
+            client = paho.Client(userdata=ud, protocol=paho.MQTTv31)
             client.on_connect = mqtt_on_connect
             client.on_message = mqtt_on_message
+            client.on_subscribe = mqtt_on_subscribe
+            client.on_disconnect = mqtt_on_disconnect
+            client.on_publish = mqtt_on_publish
             _LOGGER.info("mqtt_start (%s:%d)" % hp)
             client.connect_async(hp[0], port=hp[1])
             client.loop_start()
             return client
 
         def mqtt_stop(client):
+            client.on_disconnect = None
             client.loop_stop()
             client.disconnect()
 
@@ -415,8 +452,6 @@ USAGE
         args = parser.parse_args()
         mqtt_client = None
         if len(args.mqtt_host):
-            for _, d in args.devices.copy().items():
-                d.mqtt_start((args.mqtt_host, args.mqtt_port))
             mqtt_client = mqtt_init((args.mqtt_host, args.mqtt_port), args)
 
         _LOGGER.info(str(args))
@@ -431,7 +466,7 @@ USAGE
         EventManager.on('TimerAction', do_timer_action,
                         actionexec=actionexec, **pars)
         EventManager.on('ActionDiscovery', add_discovered_devices, devices=args.devices,
-                        mqtt_host=args.mqtt_host, mqtt_port=args.mqtt_port, emit_delay=args.emit_delay)
+                        mqtt_client=mqtt_client, mqtt_userdata=args, emit_delay=args.emit_delay)
         EventManager.on('ExtInsertAction', insert_arrived_action,
                         devices=args.devices, actionexec=actionexec)
         EventManager.on('ExtChangeState', process_state_change,
