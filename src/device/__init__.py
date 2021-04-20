@@ -75,7 +75,7 @@ class Device(object):
 
     def mqtt_on_subscribe(self, client, userdata, mid, granted_qos):
         _LOGGER.info(self.name + " subscribed: " +
-                     str(mid) + " " + str(granted_qos))
+                     str(mid) + " " + str(granted_qos) + f" ud = {userdata}")
 
     def mqtt_on_publish(self, client, userdata, mid):
         _LOGGER.info(self.name + " pub mid: " + str(mid))

@@ -576,7 +576,7 @@ class DeviceS20(DeviceUDP):
         self.state = already_saved_device.state
 
     def mqtt_on_message(self, client, userdata, msg):
-        Device.mqtt_on_message(self, client, userdata, msg)
+        DeviceUDP.mqtt_on_message(self, client, userdata, msg)
         sub = self.mqtt_sub(msg.topic)
         try:
             if sub == "state":

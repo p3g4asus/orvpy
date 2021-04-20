@@ -5,7 +5,7 @@ import time
 import paho.mqtt.client as paho
 
 from device import Device
-from util import b2s, init_logger, s2b
+from util import b2s, init_logger
 from action import (ActionStateon, ActionStateoff, ActionStatechange)
 
 _LOGGER = init_logger(__name__, level=logging.DEBUG)
@@ -16,6 +16,10 @@ class DeviceTasmotaswitch(Device):
     def __init__(self, mac='', root=None, name='', **kw):
         Device.__init__(self, ('', 0), mac, root, name)
         self.state = ""
+
+    def copy_extra_from(self, already_saved_device):
+        Device.copy_extra_from(self, already_saved_device)
+        self.state = already_saved_device.state
 
     def mqtt_inner_topic(self, prefix, suffix):
         return str(prefix + '/tasmota_switch/' + self.name + "/" + suffix)
