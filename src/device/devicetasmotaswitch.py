@@ -6,7 +6,7 @@ import paho.mqtt.client as paho
 
 from device import Device
 from util import b2s, init_logger
-from action import (ActionStateon, ActionStateoff, ActionStatechange)
+from action import (ActionStateon, ActionStateoff, ActionStatechange, ActionNotifystate)
 
 _LOGGER = init_logger(__name__, level=logging.DEBUG)
 
@@ -25,7 +25,7 @@ class DeviceTasmotaswitch(Device):
         return str(prefix + '/tasmota_switch/' + self.name + "/" + suffix)
 
     def mqtt_publish_onfinish(self, action, retval):
-        if isinstance(action, (ActionStateon, ActionStateoff)):
+        if isinstance(action, (ActionNotifystate)):
             return self.mqtt_power_state()
         else:
             return Device.mqtt_publish_onfinish(self, action, retval)
@@ -48,9 +48,8 @@ class DeviceTasmotaswitch(Device):
                     event.EventManager.fire(eventname='ExtInsertAction', hp=(
                         self.host, self.port), cmdline="", action=ActionStateon(self))
             elif msg.topic == self.mqtt_inner_topic("stat", "POWER"):
-                self.state = "1" if msg.payload == b"ON" else "0"
+                event.EventManager.fire(eventname='ExtChangeState', hp=self.host, mac=self.mac, newstate="1" if msg.payload == b"ON" else "0")
                 _LOGGER.info(f"payload = {b2s(msg.payload)} state = {self.state}")
-                self.mqtt_publish_all(self.mqtt_power_state())
         except:  # noqa: E722
             _LOGGER.warning(f"{traceback.format_exc()}")
 
@@ -112,3 +111,6 @@ class DeviceTasmotaswitch(Device):
     def mqtt_on_subscribe(self, client, userdata, mid, granted_qos):
         Device.mqtt_on_subscribe(self, client, userdata, mid, granted_qos)
         self.mqtt_publish_all([dict(topic=self.mqtt_inner_topic("cmnd", "POWER"), msg="", options=dict())])
+
+    def process_asynch_state_change(self, state):
+        self.state = b2s(state)
