@@ -384,28 +384,42 @@ USAGE
                     act = ActionNotifystate(dv, newstate)
                     actionexec.insert_action(act, 1)
 
+        def mqtt_subscribe(client, userdata, who, lsttopics):
+            if userdata and userdata.mqtt_mid is not None:
+                if isinstance(who, str):
+                    log = key = who
+                else:
+                    key = str(id(who))
+                    log = who.name
+                _, mid = client.subscribe(lsttopics)
+                userdata.mqtt_mid[key] = mid
+                _LOGGER.info(f"Asked for subscription for {log} with mid {mid}")
+
         def mqtt_on_connect(client, userdata, flags, rc):
-            if userdata.subscriptions is None and not rc:
-                _LOGGER.info("__main_. connect")
-                userdata.subscriptions = ["__main__"]
-                client.subscribe([("cmnd/#", 0,)])
+            if userdata.mqtt_mid is None and not rc:
+                _LOGGER.info("__main__ connect")
+                userdata.mqtt_mid = dict()
+                mqtt_subscribe(client, userdata, "__main__", [("cmnd/#", 0,)])
                 for _, d in userdata.devices.items():
                     d.mqtt_start(client, userdata)
-            elif rc:
-                userdata.subscriptions = None
-                client.connect_async(userdata.mqtt_host, port=userdata.mqtt_port)
-                _LOGGER.info(f"Connack {rc}")
             else:
                 _LOGGER.info(f"Ignoring connack rc {rc}")
 
         def mqtt_on_subscribe(client, userdata, mid, granted_qos):
-            if userdata and userdata.subscriptions and userdata.subscriptions[0] == "__main__":
-                del userdata.subscriptions[0]
-                _LOGGER.info("__main__ subscribed: " +
-                             str(mid) + " " + str(granted_qos))
-            else:
-                for _, d in userdata.devices.items():
-                    d.mqtt_on_subscribe(client, userdata, mid, granted_qos)
+            if userdata and userdata.mqtt_mid is not None:
+                log = 'N/A'
+                if "__main__" in userdata.mqtt_mid and userdata.mqtt_mid["__main__"] == mid:
+                    userdata.mqtt_mid["__main__"] = -1
+                    log = "__main__"
+                else:
+                    for _, d in userdata.devices.items():
+                        key = str(id(d))
+                        if key in userdata.mqtt_mid and userdata.mqtt_mid[key] == mid:
+                            userdata.mqtt_mid[key] = -1
+                            log = d.name
+                            d.mqtt_on_subscribe(client, userdata, mid, granted_qos)
+                            break
+                _LOGGER.info(f"{log} subscribed: mid={mid} qos={granted_qos}")
 
         def mqtt_on_message(client, userdata, msg):
             topic = msg.topic
@@ -425,11 +439,11 @@ USAGE
 
         def mqtt_on_disconnect(client, userdata, rc):
             _LOGGER.info("disconnect with rc: " + str(rc))
-            if rc == 3:
-                mqtt_on_connect(client, userdata, 0, 456)
+            userdata.mqtt_mid = None
 
         def mqtt_init(hp, ud):
-            ud.subscriptions = None
+            ud.mqtt_mid = None
+            ud.mqtt_subscribe = mqtt_subscribe
             client = paho.Client(userdata=ud, protocol=paho.MQTTv31)
             client.on_connect = mqtt_on_connect
             client.on_message = mqtt_on_message

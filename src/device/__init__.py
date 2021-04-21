@@ -64,24 +64,17 @@ class Device(object):
         return []  # lista di dict con topic msg e options(retain, qos)
 
     def mqtt_on_subscribe(self, client, userdata, mid, granted_qos):
-        if userdata and userdata.subscriptions and userdata.subscriptions[0] == self.mac:
-            del userdata.subscriptions[0]
-            _LOGGER.info(self.name + " subscribed: " +
-                         str(mid) + " " + str(granted_qos))
+        pass
 
     def mqtt_on_publish(self, client, userdata, mid):
         _LOGGER.info(self.name + " pub mid: " + str(mid))
 
-    def mqtt_userdata_set(self):
-        if self.mqtt_userdata:
-            self.mqtt_userdata.subscriptions.append(self.mac)
-
     def mqtt_on_connect(self, client, userdata, flags, rc):
         _LOGGER.info(self.name + " CONNACK received with code %d." % (rc))
         self.mqtt_publish_all(self.mqtt_publish_onstart())
-        self.mqtt_userdata_set()
         lsttopic = self.mqtt_subscribe_topics()
-        client.subscribe(lsttopic)
+        if lsttopic and self.mqtt_userdata:
+            self.mqtt_userdata.mqtt_subscribe(client, userdata, self, lsttopic)
 
     def mqtt_on_message(self, client, userdata, msg):
         if msg.topic.startswith(f"cmnd/{self.__class__.__name__[6:].lower()}/{self.name}/") or self.mqtt_subscribe_topics():

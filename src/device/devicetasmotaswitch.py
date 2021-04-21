@@ -67,17 +67,17 @@ class DeviceTasmotaswitch(Device):
         client.subscribe([("tele/tasmota_switch/+/LWT", 0,)])
 
     @staticmethod
-    def mqtt_on_message_discovery(client, userdata, msg):
+    def mqtt_on_message_discovery(client, devices, msg):
         topic = b2s(msg.topic)
         devname = topic[len("tele/tasmota_switch/"):-4]
         _LOGGER.info(f"Found {devname}")
-        client.devices["tasmota_switch_" + devname] = DeviceTasmotaswitch(mac="tasmota_switch_" + devname, name=devname)
+        devices["tasmota_switch_" + devname] = DeviceTasmotaswitch(mac="tasmota_switch_" + devname, name=devname)
 
     @staticmethod
     def discovery(mqtt_hp, timeout=5, **kwargs):
         _LOGGER.info("searching for devices tasmotaswitch")
-        client = paho.Client()
-        client.devices = dict()
+        devices = dict()
+        client = paho.Client(userdata=devices, protocol=paho.MQTTv31)
         client.on_connect = DeviceTasmotaswitch.mqtt_on_connect_discovery
         client.on_message = DeviceTasmotaswitch.mqtt_on_message_discovery
         _LOGGER.info("mqtt_start (%s:%d)" % mqtt_hp)
@@ -86,7 +86,7 @@ class DeviceTasmotaswitch(Device):
         time.sleep(timeout)
         client.loop_stop()
         client.disconnect()
-        return client.devices
+        return devices
 
     def get_action_payload(self, action):
         if isinstance(action, ActionStatechange):
