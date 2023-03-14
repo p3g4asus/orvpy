@@ -267,7 +267,7 @@ USAGE
         parser.add_argument('-d', '--debug', action='store_true', dest="debug")
         parser.add_argument(
             '-e', '--remote', action='store_true', dest="remote")
-
+        parser.add_argument("-P", "--pid", dest="pid")
         parser.set_defaults(conf=os.path.join(os.getcwd(), 'devices.xml'),
                             devices={},
                             mqtt_host='',
@@ -287,7 +287,8 @@ USAGE
                             prime_port=80,
                             prime_port2=6004,
                             prime_code='',
-                            prime_pass=''
+                            prime_pass='',
+                            pid=''
                             )
 
         def connect_devices(devices):
@@ -464,6 +465,9 @@ USAGE
         signal(SIGTERM, sigterm_handler)
         _LOGGER.info("Parsing args")
         args = parser.parse_args()
+        if args.pid:
+            with open(args.pid, "w") as f:
+                f.write(str(os.getpid()))
         mqtt_client = None
         if len(args.mqtt_host):
             mqtt_client = mqtt_init((args.mqtt_host, args.mqtt_port), args)
