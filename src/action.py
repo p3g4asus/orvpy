@@ -178,6 +178,8 @@ class ActionDiscovery(Action):
             self.hosts.update(DeviceTasmotaswitch.discovery((actionexec.mqtt_host, actionexec.mqtt_port), timeout))
         self.hosts.update(DeviceUpnp.discovery())
         self.hosts.update(DeviceUDP.discovery(actionexec, timeout))
+        for _, d in self.hosts.items():
+            d.set_homeassistant(actionexec.homeassistant)
         return 1 if len(self.hosts) else 2
 
     def get_timeout(self):

@@ -84,7 +84,51 @@ class DevicePrimelan(Device):
             'nick': self.nick,
             'state': self.state,
             'oldstate': self.oldstate}
-        return [dict(topic=self.mqtt_topic("stat", "device"), msg=json.dumps(out), options=dict(retain=True))]
+        lst = [dict(topic=self.mqtt_topic("stat", "device"), msg=json.dumps(out), options=dict(retain=True))]
+        if self.homeassistant:
+            cmd = None
+            if self.subtype == 1:
+                topic = f'{self.homeassistant}/switch/{self.name}/config'
+                cmd = dict(
+                    availability_topic=f'stat/{self.__class__.__name__[6:].lower()}/{self.name}/power',
+                    command_topic=f'cmnd/{self.__class__.__name__[6:].lower()}/{self.name}/state',
+                    payload_not_available='-1',
+                    payload_off='0',
+                    payload_on='1',
+                    state_off='0',
+                    state_on='1',
+                    name=self.name
+                )
+            elif self.subtype == 0:
+                topic = f'{self.homeassistant}/button/{self.name}/config'
+                cmd = dict(
+                    availability_topic=f'stat/{self.__class__.__name__[6:].lower()}/{self.name}/device',
+                    payload_not_available='-1',
+                    command_topic=f'cmnd/{self.__class__.__name__[6:].lower()}/{self.name}/state',
+                    payload_press='1',
+                    name=self.name
+                )
+            elif self.subtype == 2:
+                topic = f'{self.homeassistant}/light/{self.name}/config'
+                cmd = dict(
+                    availability_topic=f'stat/{self.__class__.__name__[6:].lower()}/{self.name}/device',
+                    brightness_state_topic=f'stat/{self.__class__.__name__[6:].lower()}/{self.name}/device',
+                    state_topic=f'stat/{self.__class__.__name__[6:].lower()}/{self.name}/device',
+                    command_topic=f'cmnd/{self.__class__.__name__[6:].lower()}/{self.name}/state',
+                    brightness_command_topic=f'cmnd/{self.__class__.__name__[6:].lower()}/{self.name}/state',
+                    brightness_value_template='{{value_json.state}}',
+                    brightness_command_template='{{value}}',
+                    brightness_scale=100,
+                    on_command_type='brightness',
+                    payload_not_available='-1',
+                    payload_off='0',
+                    payload_on='1000',
+                    name=self.name,
+                    state_value_template='{{ "1000" if (value_json.state | int) > 0 else "0" }}'
+                )
+            if cmd:
+                lst.append([dict(topic=topic, msg=json.dumps(cmd), options=dict(retain=True))])
+        return lst
 
     def mqtt_on_message(self, client, userdata, msg):
         Device.mqtt_on_message(self, client, userdata, msg)

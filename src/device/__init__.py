@@ -216,6 +216,10 @@ class Device(object):
         self.mqtt_client = None
         self.mqtt_userdata = None
         self.mqtt_topic_retain = dict()
+        self.homeassistant = ''
+
+    def set_homeassistant(self, h):
+        self.homeassistant = h
 
     def copy_extra_from(self, already_saved_device):
         self.timers = already_saved_device.timers

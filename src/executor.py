@@ -21,6 +21,7 @@ class ActionExecutor(threading.Thread):
         self.stopped = True
         self.tcpserver = None
         self.httpserver = None
+        self.homeassistant = ''
         self.asynch_action_rv = RV_NOT_EXECUTED
         self.prime_hp = ('', 80)
         self.prime_code = ''
@@ -37,6 +38,7 @@ class ActionExecutor(threading.Thread):
         self.prime_port2 = options.prime_port2
         self.mqtt_host = options.mqtt_host
         self.mqtt_port = options.mqtt_port
+        self.homeassistant = options.homeassistant
         if self.action_list_l is None:
             self.action_list_l = threading.Condition()
             self.asynch_action_l = threading.Condition()

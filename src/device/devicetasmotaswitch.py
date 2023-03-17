@@ -1,6 +1,7 @@
 import logging
 import traceback
 import event
+import json
 import time
 import paho.mqtt.client as paho
 
@@ -106,7 +107,21 @@ class DeviceTasmotaswitch(Device):
             return Device.send_action(self, actionexec, action, state)
 
     def mqtt_power_state(self):
-        return [dict(topic=self.mqtt_topic("stat", "power"), msg="-1" if self.state != "0" and self.state != "1" else str(self.state), options=dict(retain=True))]
+        lst = []
+        if self.homeassistant:
+            cmd = dict(
+                availability_topic=f'stat/{self.__class__.__name__[6:].lower()}/{self.name}/power',
+                command_topic=f'cmnd/{self.__class__.__name__[6:].lower()}/{self.name}/state',
+                payload_not_available='-1',
+                payload_off='0',
+                payload_on='1',
+                state_off='0',
+                state_on='1',
+                name=self.name
+            )
+            lst.append([dict(topic=f'{self.homeassistant}/switch/{self.name}/config', msg=json.dumps(cmd), options=dict(retain=True))])
+        lst.append([dict(topic=self.mqtt_topic("stat", "power"), msg="-1" if self.state != "0" and self.state != "1" else str(self.state), options=dict(retain=True))])
+        return lst
 
     def mqtt_on_subscribe(self, client, userdata, mid, granted_qos):
         Device.mqtt_on_subscribe(self, client, userdata, mid, granted_qos)

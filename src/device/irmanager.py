@@ -311,14 +311,43 @@ class IrManager(Device):
                     lst[nm].append(tpl[1])
         return [dict(topic=self.mqtt_topic("stat", topic), msg=json.dumps(lst), options=dict(retain=True))]
 
+    def mqtt_homeassistant_publish_dir(self, lst2, topic):
+        lst = list()
+        for nm in lst2:
+            d433d = lst2[nm]
+            for irnm in d433d:
+                tpl = d433d[irnm]
+                if len(tpl[1]):
+                    cmd = dict(
+                        command_topic=f'cmnd/{self.__class__.__name__[6:].lower()}/{self.name}/emit',
+                        payload_press=f'["{nm}:{tpl[1]}"]',
+                        name=f'{self.name}-{nm}:{tpl[1]}'
+                    )
+                    lst.append([dict(topic=f'{self.homeassistant}/button/{topic}_{self.name}_{nm}_{tpl[1]}/config', msg=json.dumps(cmd), options=dict(retain=True))])
+        return lst
+
     def mqtt_publish_sh(self, lst2, topic):
         lst = lst2.keys()
         return [dict(topic=self.mqtt_topic("stat", topic), msg=json.dumps(lst), options=dict(retain=True))]
+
+    def mqtt_homeassistant_publish_sh(self, lst2, topic):
+        lst = []
+        for nm, _ in lst2.items:
+            cmd = dict(
+                command_topic=f'cmnd/{self.__class__.__name__[6:].lower()}/{self.name}/emit',
+                payload_press=f'["{nm}"]',
+                name=f'{self.name}-{nm}'
+            )
+            lst.append([dict(topic=f'{self.homeassistant}/button/{topic}_{self.name}_{nm}/config', msg=json.dumps(cmd), options=dict(retain=True))])
+        return lst
 
     def mqtt_publish_onstart(self):
         out = self.mqtt_publish_dir(self.dir, "remotes")
         out.extend(self.mqtt_publish_dir(self.d433, "r433s"))
         out.extend(self.mqtt_publish_sh(self.sh, "shortcuts"))
+        if self.homeassistant:
+            out.extend(self.mqtt_homeassistant_publish_dir(self.dir, "remotes"))
+            out.extend(self.mqtt_homeassistant_publish_sh(self.sh, "sh"))
         return out
 
     def mqtt_on_message(self, client, userdata, msg):
