@@ -249,7 +249,7 @@ USAGE
         parser.add_argument("-q", "--prime-code",
                             dest="prime_code", type=valid_code)
         parser.add_argument("-z", "--prime-pass", dest="prime_pass")
-        parser.add_argument("-h", "--home-assistant", dest="homeassistant")
+        parser.add_argument("-H", "--home-assistant", dest="homeassistant")
         parser.add_argument("-p", "--port", dest="port", type=valid_port)
         parser.add_argument("-s", "--tcpport", dest="tcpport", type=valid_port)
         parser.add_argument("-g", "--httpport",
@@ -470,7 +470,7 @@ USAGE
         if args.pid:
             with open(args.pid, "w") as f:
                 f.write(str(os.getpid()))
-        for _, d in args.devices:
+        for _, d in args.devices.items():
             d.set_homeassistant(args.homeassistant)
         mqtt_client = None
         if len(args.mqtt_host):

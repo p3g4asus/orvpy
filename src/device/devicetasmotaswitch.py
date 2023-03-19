@@ -107,7 +107,7 @@ class DeviceTasmotaswitch(Device):
             return Device.send_action(self, actionexec, action, state)
 
     def mqtt_power_state(self):
-        lst = []
+        lst = [dict(topic=self.mqtt_topic("stat", "power"), msg="-1" if self.state != "0" and self.state != "1" else str(self.state), options=dict(retain=True))]
         if self.homeassistant:
             cmd = dict(
                 availability_topic=f'stat/{self.__class__.__name__[6:].lower()}/{self.name}/power',
@@ -119,8 +119,7 @@ class DeviceTasmotaswitch(Device):
                 state_on='1',
                 name=self.name
             )
-            lst.append([dict(topic=f'{self.homeassistant}/switch/{self.name}/config', msg=json.dumps(cmd), options=dict(retain=True))])
-        lst.append([dict(topic=self.mqtt_topic("stat", "power"), msg="-1" if self.state != "0" and self.state != "1" else str(self.state), options=dict(retain=True))])
+            lst.append(dict(topic=f'{self.homeassistant}/switch/{self.name}/config', msg=json.dumps(cmd), options=dict(retain=True)))
         return lst
 
     def mqtt_on_subscribe(self, client, userdata, mid, granted_qos):

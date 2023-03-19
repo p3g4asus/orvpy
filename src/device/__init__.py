@@ -86,6 +86,7 @@ class Device(object):
             for p in lsttopic:
                 retain = p["options"].get('retain', False)
                 if not retain or self.mqtt_topic_retain.get(p["topic"], None) != p["msg"]:
+                    _LOGGER.info(f"{self.name} publishing {p['topic']} -> {p['msg']}")
                     self.mqtt_client.publish(
                         p["topic"], p["msg"], **p["options"])
                     if retain:

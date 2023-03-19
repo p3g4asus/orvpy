@@ -128,3 +128,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+myscript.conf
+src/samsungctl
+tox.ini

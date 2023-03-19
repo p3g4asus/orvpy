@@ -315,15 +315,16 @@ class IrManager(Device):
         lst = list()
         for nm in lst2:
             d433d = lst2[nm]
-            for irnm in d433d:
-                tpl = d433d[irnm]
+            for _, tpl in d433d.items():
                 if len(tpl[1]):
+                    irnm = tpl[1].replace('+', 'plus').replace('-', 'minus')
+                    dct = [dict(key=tpl[1], remote=nm)]
                     cmd = dict(
                         command_topic=f'cmnd/{self.__class__.__name__[6:].lower()}/{self.name}/emit',
-                        payload_press=f'["{nm}:{tpl[1]}"]',
+                        payload_on=json.dumps(dct),
                         name=f'{self.name}-{nm}:{tpl[1]}'
                     )
-                    lst.append([dict(topic=f'{self.homeassistant}/button/{topic}_{self.name}_{nm}_{tpl[1]}/config', msg=json.dumps(cmd), options=dict(retain=True))])
+                    lst.append(dict(topic=f'{self.homeassistant}/scene/{topic}_{self.name}_{nm}_{irnm}/config', msg=json.dumps(cmd), options=dict(retain=True)))
         return lst
 
     def mqtt_publish_sh(self, lst2, topic):
@@ -332,13 +333,15 @@ class IrManager(Device):
 
     def mqtt_homeassistant_publish_sh(self, lst2, topic):
         lst = []
-        for nm, _ in lst2.items:
+        for nm, _ in lst2.items():
+            irnm = nm.replace('+', 'plus').replace('-', 'minus')
+            dct = [dict(key=f'@{nm}')]
             cmd = dict(
                 command_topic=f'cmnd/{self.__class__.__name__[6:].lower()}/{self.name}/emit',
-                payload_press=f'["{nm}"]',
+                payload_on=json.dumps(dct),
                 name=f'{self.name}-{nm}'
             )
-            lst.append([dict(topic=f'{self.homeassistant}/button/{topic}_{self.name}_{nm}/config', msg=json.dumps(cmd), options=dict(retain=True))])
+            lst.append(dict(topic=f'{self.homeassistant}/scene/{topic}_{self.name}_{irnm}/config', msg=json.dumps(cmd), options=dict(retain=True)))
         return lst
 
     def mqtt_publish_onstart(self):
