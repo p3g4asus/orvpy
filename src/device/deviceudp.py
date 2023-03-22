@@ -541,7 +541,7 @@ class DeviceS20(DeviceUDP):
         # else:
         #    self.state = int(root.attributes['state'].value)
 
-    def process_asynch_state_change(self, state):
+    def process_asynch_state_change(self, state, device_connected=None):
         self.state = b2s(state)
 
     def parse_action_timer_args(self, args):
@@ -616,6 +616,7 @@ class DeviceS20(DeviceUDP):
                 payload_on='1',
                 state_off='0',
                 state_on='1',
+                unique_id=tohexs(self.mac),
                 name=self.name
             )
             lst.append(dict(topic=f'{self.homeassistant}/switch/{self.name}/config', msg=json.dumps(cmd), options=dict(retain=True)))

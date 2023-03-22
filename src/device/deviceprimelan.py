@@ -13,7 +13,7 @@ from action import ActionNotifystate, ActionStatechange
 from Crypto.Cipher import AES
 from device import Device
 from transport import TCPClient
-from util import b2s, init_logger, s2b
+from util import b2s, init_logger, s2b, tohexs
 
 if sys.version_info >= (3, 0):
     from functools import reduce
@@ -28,7 +28,7 @@ class DevicePrimelan(Device):
     # 1: slider 0-100
     TIMEOUT = 7
 
-    def process_asynch_state_change(self, state):
+    def process_asynch_state_change(self, state, device_connected=None):
         self.last_get = time.time()
         _LOGGER.info(f"{id(self)} {self.name} last_get = {self.last_get}")
         if self.state != state:
@@ -104,6 +104,7 @@ class DevicePrimelan(Device):
                     payload_off='0',
                     payload_on='1000',
                     name=self.name,
+                    unique_id=tohexs(self.mac),
                     state_value_template='{{ "1000" if (value_json.state | int) > 0 else "0" }}'
                 )
             elif self.subtype == 0:
@@ -117,6 +118,7 @@ class DevicePrimelan(Device):
                     payload_on='1',
                     state_off='0',
                     state_on='1',
+                    unique_id=tohexs(self.mac),
                     value_template='{{ "1" if (value_json.state | int) > 0 else "0" }}',
                     name=self.name
                 )
@@ -130,6 +132,7 @@ class DevicePrimelan(Device):
                     payload_off='0',
                     payload_on='1',
                     name=self.name,
+                    unique_id=tohexs(self.mac),
                     state_value_template='{{ "1" if (value_json.state | int) > 0 else "0" }}'
                 )
             if cmd:

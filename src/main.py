@@ -38,7 +38,7 @@ from device.deviceudp import DeviceS20
 from device.irmanager import IrManager
 from event import EventManager
 from executor import ActionExecutor
-from util import class_forname, init_logger, b2s
+from util import class_forname, init_logger, b2s, tohexs
 
 __all__ = []
 __version__ = 0.1
@@ -380,12 +380,33 @@ USAGE
             if action is not None:
                 action.set_devices(devices)
 
-        def process_state_change(hp, newstate, devices, mac, actionexec, **kwargs):
+        def process_set_connection(conn_id, device_name, setorunset, notifyto, connections, devices, **kwargs):
+            mac = ''
+            for _, dv in devices.items():
+                if device_name == dv.name:
+                    mac = dv.mac
+                    break
+            if mac:
+                if not setorunset:
+                    if mac in connections and conn_id in connections[mac]:
+                        del connections[mac][conn_id]
+                        if not connections[mac]:
+                            del connections[mac]
+                else:
+                    if mac not in connections:
+                        connections[mac] = {}
+                    connections[mac][conn_id] = notifyto
+
+        def process_state_change(hp, newstate, devices, mac, actionexec, connections, **kwargs):
             _LOGGER.info(f'ExtStateChange {mac}')
             for _, dv in devices.items():
                 if mac == dv.mac:
                     act = ActionNotifystate(dv, newstate)
                     actionexec.insert_action(act, 1)
+                    if mac in connections:
+                        for _, notifyto in connections[mac].items():
+                            act = ActionNotifystate(notifyto, newstate, device_connected=dv)
+                            actionexec.insert_action(act, 1)
 
         def mqtt_subscribe(client, userdata, who, lsttopics):
             if userdata and userdata.mqtt_mid is not None:
@@ -467,6 +488,7 @@ USAGE
         signal(SIGTERM, sigterm_handler)
         _LOGGER.info("Parsing args")
         args = parser.parse_args()
+        connections = {}
         if args.pid:
             with open(args.pid, "w") as f:
                 f.write(str(os.getpid()))
@@ -478,7 +500,6 @@ USAGE
 
         _LOGGER.info(str(args))
         _LOGGER.info(args.devices)
-        connect_devices(args.devices)
         actionexec = ActionExecutor()
         if not args.active_on_finish:
             EventManager.on('ActionDone', terminate_on_finish,
@@ -492,7 +513,9 @@ USAGE
         EventManager.on('ExtInsertAction', insert_arrived_action,
                         devices=args.devices, actionexec=actionexec)
         EventManager.on('ExtChangeState', process_state_change,
-                        actionexec=actionexec, devices=args.devices)
+                        actionexec=actionexec, devices=args.devices, connections=connections)
+        EventManager.on('ExtSetConnection', process_set_connection,
+                        connections=connections, devices=args.devices)
         EventManager.on('ActionDiscovery', save_modified_devices, **pars)
         EventManager.on('ActionLearnir', save_modified_devices, **pars)
         EventManager.on('ActionEditraw', save_modified_devices, **pars)
@@ -509,6 +532,7 @@ USAGE
                         devices=args.devices, **pars)
         EventManager.on('ActionExit', terminate_on_finish,
                         actionexec=actionexec, force=True)
+        connect_devices(args.devices)
         actionexec.configure(args)
         if len(args.mqtt_host):
             actionexec.insert_action(ActionPause("5"))

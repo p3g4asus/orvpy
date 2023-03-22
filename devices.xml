@@ -770,52 +770,103 @@
     </device>
     <device host="192.168.25.51" id="56" mac="c380c2a819330038" mytime="1608635525449" name="lampadari" nick="lampadari" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="2" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
     <device host="192.168.25.51" id="63" mac="c380c2a81933003f" mytime="1608635525449" name="tende_iateraii_s" nick="tende iateraii s" offlimit="60" passw="pass" port="80" port2="6004" qindex="0" subtype="2" tk="44593421765C99CD19E296B1EE4F74DA" type="DevicePrimelan"/>
-    <device host="127.0.0.1" mac="96f2e2e44500" mytime="1608635525449" name="tenda" offlimit="0" port="3001" type="DeviceVirtual">
+    <device host="127.0.0.1" mac="96f2e2e44500" mytime="1608635525449" name="tendabagno" offlimit="0" port="3001" type="DeviceVirtual">
       <targets>
-        <target>tende_iateraii_s</target>
-        <target>tende_iaterai_d</target>
-        <target>tendacentraiesai</target>
-        <target>tendacentraiedis</target>
-        <target>salita_camera</target>
-        <target>discesa_camera</target>
-        <target>salita_cabina</target>
-        <target>discesa_cabina</target>
         <target>salita_bagno</target>
         <target>discesa_bagno</target>
       </targets>
       <states>
-        <state nick="laterale_giu" value="10">
-          <action device="tende_iaterai_d">1</action>
-        </state>
-        <state nick="centrale_giu" value="20">
-          <action device="tendacentraiedis">1</action>
-        </state>
-        <state nick="camera_giu" value="30">
-          <action device="discesa_camera">1</action>
-        </state>
-        <state nick="bagno_giu" value="50">
+        <state nick="bagno_giu" value="10">
+          <action device="salita_bagno">0</action>
           <action device="discesa_bagno">1</action>
         </state>
-        <state nick="cabina_giu" value="40">
-          <action device="discesa_cabina">1</action>
-        </state>
-        <state nick="laterale_su" value="1">
-          <action device="tende_iateraii_s">1</action>
-        </state>
-        <state nick="tenda_stop" value="0">
-          <action device="$lasttargetdef">0</action>
-        </state>
-        <state nick="camera_su" value="3">
-          <action device="salita_camera">1</action>
-        </state>
-        <state nick="centrale_su" value="2">
-          <action device="tendacentraiesai">1</action>
-        </state>
-        <state nick="bagno_su" value="5">
+        <state nick="bagno_su" value="20">
+          <action device="discesa_bagno">0</action>
           <action device="salita_bagno">1</action>
         </state>
-        <state nick="cabina_su" value="4">
+        <state nick="bagno_stop" value="0">
+          <action device="discesa_bagno">0</action>
+          <action device="salita_bagno">0</action>
+        </state>
+      </states>
+    </device>
+    <device host="127.0.0.1" mac="96f2e2e44504" mytime="1608635525449" name="tendacamera" offlimit="0" port="3001" type="DeviceVirtual">
+      <targets>
+        <target>salita_camera</target>
+        <target>discesa_camera</target>
+      </targets>
+      <states>
+        <state nick="camera_giu" value="10">
+          <action device="salita_camera">0</action>
+          <action device="discesa_camera">1</action>
+        </state>
+        <state nick="camera_su" value="20">
+          <action device="discesa_camera">0</action>
+          <action device="salita_camera">1</action>
+        </state>
+        <state nick="camera_stop" value="0">
+          <action device="discesa_camera">0</action>
+          <action device="salita_camera">0</action>
+        </state>
+      </states>
+    </device>
+    <device host="127.0.0.1" mac="96f2e2e44501" mytime="1608635525449" name="tendacabina" offlimit="0" port="3001" type="DeviceVirtual">
+      <targets>
+        <target>salita_cabina</target>
+        <target>discesa_cabina</target>
+      </targets>
+      <states>
+        <state nick="cabina_giu" value="10">
+          <action device="salita_cabina">0</action>
+          <action device="discesa_cabina">1</action>
+        </state>
+        <state nick="cabina_su" value="20">
+          <action device="discesa_cabina">0</action>
           <action device="salita_cabina">1</action>
+        </state>
+        <state nick="cabina_stop" value="0">
+          <action device="discesa_cabina">0</action>
+          <action device="salita_cabina">0</action>
+        </state>
+      </states>
+    </device>
+    <device host="127.0.0.1" mac="96f2e2e44503" mytime="1608635525449" name="tendalaterale" offlimit="0" port="3001" type="DeviceVirtual">
+      <targets>
+        <target>tende_iateraii_s</target>
+        <target>tende_iaterai_d</target>
+      </targets>
+      <states>
+        <state nick="laterale_giu" value="10">
+          <action device="tende_iateraii_s">0</action>
+          <action device="tende_iaterai_d">1</action>
+        </state>
+        <state nick="laterale_su" value="20">
+          <action device="tende_iaterai_d">0</action>
+          <action device="tende_iateraii_s">1</action>
+        </state>
+        <state nick="laterale_stop" value="0">
+          <action device="tende_iaterai_d">0</action>
+          <action device="tende_iateraii_s">0</action>
+        </state>
+      </states>
+    </device>
+    <device host="127.0.0.1" mac="96f2e2e44502" mytime="1608635525449" name="tendacentrale" offlimit="0" port="3001" type="DeviceVirtual">
+      <targets>
+        <target>tendacentraiesai</target>
+        <target>tendacentraiedis</target>
+      </targets>
+      <states>
+        <state nick="centrale_giu" value="10">
+          <action device="tendacentraiesai">0</action>
+          <action device="tendacentraiedis">1</action>
+        </state>
+        <state nick="centrale_su" value="20">
+          <action device="tendacentraiedis">0</action>
+          <action device="tendacentraiesai">1</action>
+        </state>
+        <state nick="centrale_stop" value="0">
+          <action device="tendacentraiedis">0</action>
+          <action device="tendacentraiesai">0</action>
         </state>
       </states>
     </device>

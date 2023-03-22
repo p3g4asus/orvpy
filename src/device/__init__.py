@@ -30,7 +30,7 @@ class Device(object):
     epoch = datetime.utcfromtimestamp(0)
     GET_STATE_ACTION = '-999'
 
-    def process_asynch_state_change(self, state):
+    def process_asynch_state_change(self, state, device_connected=None):
         pass
 
     def connect_devices(self, device_map):

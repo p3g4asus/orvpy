@@ -223,9 +223,9 @@ class ActionDevicedl(Action):
 
 
 class ActionNotifystate(Action):
-    def __init__(self, device, state):
+    def __init__(self, device, state, device_connected=None):
         super(ActionNotifystate, self).__init__(device)
-        self.device.process_asynch_state_change(state)
+        self.device.process_asynch_state_change(state, device_connected=device_connected)
 
     def modifies_device(self):
         return False

@@ -6,7 +6,7 @@ import time
 import paho.mqtt.client as paho
 
 from device import Device
-from util import b2s, init_logger
+from util import b2s, init_logger, tohexs
 from action import (ActionStateon, ActionStateoff, ActionStatechange, ActionNotifystate)
 
 _LOGGER = init_logger(__name__, level=logging.DEBUG)
@@ -117,6 +117,7 @@ class DeviceTasmotaswitch(Device):
                 payload_on='1',
                 state_off='0',
                 state_on='1',
+                unique_id=tohexs(self.mac),
                 name=self.name
             )
             lst.append(dict(topic=f'{self.homeassistant}/switch/{self.name}/config', msg=json.dumps(cmd), options=dict(retain=True)))
@@ -126,5 +127,5 @@ class DeviceTasmotaswitch(Device):
         Device.mqtt_on_subscribe(self, client, userdata, mid, granted_qos)
         self.mqtt_publish_all([dict(topic=self.mqtt_inner_topic("cmnd", "POWER"), msg="", options=dict())])
 
-    def process_asynch_state_change(self, state):
+    def process_asynch_state_change(self, state, device_connected=None):
         self.state = b2s(state)

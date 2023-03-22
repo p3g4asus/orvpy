@@ -311,18 +311,22 @@ class IrManager(Device):
                     lst[nm].append(tpl[1])
         return [dict(topic=self.mqtt_topic("stat", topic), msg=json.dumps(lst), options=dict(retain=True))]
 
+    def mqtt_sanitize_name(self, nm):
+        return nm.replace('+', 'plus').replace('-', 'minus').replace('!', '').replace(' ', '_').replace('.', '_')
+
     def mqtt_homeassistant_publish_dir(self, lst2, topic):
         lst = list()
         for nm in lst2:
             d433d = lst2[nm]
             for _, tpl in d433d.items():
                 if len(tpl[1]):
-                    irnm = tpl[1].replace('+', 'plus').replace('-', 'minus')
+                    irnm = self.mqtt_sanitize_name(tpl[1])
                     dct = [dict(key=tpl[1], remote=nm)]
                     cmd = dict(
                         command_topic=f'cmnd/{self.__class__.__name__[6:].lower()}/{self.name}/emit',
                         payload_on=json.dumps(dct),
-                        name=f'{self.name}-{nm}:{tpl[1]}'
+                        name=f'{self.name}-{nm}:{tpl[1]}',
+                        unique_id=f'{tohexs(self.mac)}_r_{nm}_k_{irnm}',
                     )
                     lst.append(dict(topic=f'{self.homeassistant}/scene/{topic}_{self.name}_{nm}_{irnm}/config', msg=json.dumps(cmd), options=dict(retain=True)))
         return lst
@@ -334,11 +338,12 @@ class IrManager(Device):
     def mqtt_homeassistant_publish_sh(self, lst2, topic):
         lst = []
         for nm, _ in lst2.items():
-            irnm = nm.replace('+', 'plus').replace('-', 'minus')
+            irnm = self.mqtt_sanitize_name(nm)
             dct = [dict(key=f'@{nm}')]
             cmd = dict(
                 command_topic=f'cmnd/{self.__class__.__name__[6:].lower()}/{self.name}/emit',
                 payload_on=json.dumps(dct),
+                unique_id=f'{tohexs(self.mac)}_s_{irnm}',
                 name=f'{self.name}-{nm}'
             )
             lst.append(dict(topic=f'{self.homeassistant}/scene/{topic}_{self.name}_{irnm}/config', msg=json.dumps(cmd), options=dict(retain=True)))
