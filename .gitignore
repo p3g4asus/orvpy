@@ -131,3 +131,4 @@ dmypy.json
 myscript.conf
 src/samsungctl
 tox.ini
+devices.xml
