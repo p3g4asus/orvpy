@@ -611,9 +611,10 @@ class DeviceS20(DeviceUDP):
             cmd = dict(
                 availability_topic=f'stat/{self.__class__.__name__[6:].lower()}/{self.name}/power',
                 command_topic=f'cmnd/{self.__class__.__name__[6:].lower()}/{self.name}/state',
-                payload_not_available='-1',
+                availability_template='{{ "offline" if value == "-1" else "online" }}',
                 payload_off='0',
                 payload_on='1',
+                platform='switch',
                 state_off='0',
                 state_on='1',
                 unique_id=tohexs(self.mac),
