@@ -608,15 +608,17 @@ class DeviceS20(DeviceUDP):
     def mqtt_power_state(self):
         lst = [dict(topic=self.mqtt_topic("stat", "power"), msg="-1" if self.state != "0" and self.state != "1" else str(self.state), options=dict(retain=True))]
         if self.homeassistant:
+            topicmid = f'{self.__class__.__name__[6:].lower()}/{self.name}'
+            staava = f'stat/{topicmid}/power'
             cmd = dict(
-                availability_topic=f'stat/{self.__class__.__name__[6:].lower()}/{self.name}/power',
-                command_topic=f'cmnd/{self.__class__.__name__[6:].lower()}/{self.name}/state',
+                availability_topic=staava,
+                state_topic=staava,
+                command_topic=f'cmnd/{topicmid}/state',
                 availability_template='{{ "offline" if value == "-1" else "online" }}',
+                value_template='{{ "None" if value == "-1" else value }}',
                 payload_off='0',
                 payload_on='1',
                 platform='switch',
-                state_off='0',
-                state_on='1',
                 unique_id=tohexs(self.mac),
                 name=self.name
             )
