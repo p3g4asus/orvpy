@@ -223,7 +223,73 @@ class DevicePrimelan(Device):
         return reduce(lambda x, y: ((x >> 8) & 0xff) ^ DevicePrimelan.crc16_table[(x ^ y) & 0xff], ba, 0)
 
     @staticmethod
+    def tcp_type_to_subtype(typev):
+        if typev == 0x01:
+            return 0
+        elif typev == 0x05:
+            return 1
+        elif typev == 0x06:
+            return 2
+        else:
+            return 0
+
+    @staticmethod
+    def discovery_tcp(hp, passw, codu, port2, timeout=10):
+        startidx = 0
+        oldstartidx = startidx
+        n = 20
+        maxidx = 245
+        out = {}
+        key = DevicePrimelan.key_from_passw(passw)
+        iv = DevicePrimelan.iv_from_key(key)
+        t = TCPClient(timeout)
+        while startidx < maxidx:
+            try:
+                oldstartidx = startidx
+                n2 = n if startidx + n <= maxidx else maxidx - startidx
+                byvals = DevicePrimelan.pkt_state_get_c(startidx, n2, key, iv)
+                _LOGGER.info(f'Get state for id {startidx} -> {byvals.hex()}')
+                if (rv := t.send_packet((hp[0], port2), byvals)) and (decrypted := DevicePrimelan.pkt_state_get_process_response(rv, key, iv)):
+                    start = 18
+                    while start < len(decrypted):
+                        typeel = decrypted[start]
+                        state0 = state1 = None
+                        if typeel == 0x01 or typeel == 0x06:
+                            state0 = int(decrypted[start + 1])
+                            _LOGGER.info(f'Device {startidx} state: {state0}')
+                        elif typeel == 0x05:
+                            state0 = int(decrypted[start + 1])
+                            state1 = int(decrypted[start + 2])
+                            _LOGGER.info(f'Device {startidx} state: {state1}/{state0}')
+                        if state0 is not None:
+                            idv = f'{startidx}'
+                            name = f'{hp[0]}_{idv}_{"switch" if typeel == 0x01 else "power_controlled_dimmer" if typeel == 0x05 else "power_controlled_switch"}'
+                            _LOGGER.info(f'TCP Discovered device id {idv} name {name} type {typeel} state {state0}/{state1}')
+                            dev = DevicePrimelan(
+                                hp=hp,
+                                mac=DevicePrimelan.generate_mac(hp[0], idv),
+                                name=name,
+                                idv=idv,
+                                typev=DevicePrimelan.tcp_type_to_subtype(typeel),
+                                tk=idv,
+                                qindex=f'{idv}',
+                                state=DevicePrimelan.states_to_real_state(state0, state1),
+                                passw=passw,
+                                port2=port2)
+                            out['{}:{}'.format(*hp) + ':' + idv] = dev
+                        start += 10
+                        startidx += 1
+            except Exception:  # noqa: E722
+                startidx = oldstartidx + n
+                _LOGGER.warning(f"Discovery error: {traceback.format_exc()}")
+        return out
+
+    @staticmethod
     def discovery(hp, passw, codu, port2, timeout=10):
+        return DevicePrimelan.discovery_tcp(hp, passw, codu, port2, timeout)
+
+    @staticmethod
+    def discovery_http(hp, passw, codu, port2, timeout=10):
         try:
             r = requests.post('http://{}:{}/cgi-bin/web.cgi'.format(*hp),
                               data={'pass': passw, 'code': codu, 'mod': 'auth'}, timeout=timeout)
@@ -322,55 +388,63 @@ class DevicePrimelan(Device):
         crc = DevicePrimelan.crc16(bytearray(out + aesc2))
         return pre + struct.pack("<H", crc) + out + aesc2
 
-    def pkt_state_get(self, n: int = 1):
+    @staticmethod
+    def pkt_state_get_c(startidx: int, n: int, key: bytes, iv: bytes) -> bytes:
         pre = b'\x50\x53\x00\x00\x1a\x00\x00\x00\xea\x00\x00\x00\x50\x50'
         out = b'\x01\x00\x1a\x00\x00\x00'
-        idi = int(self.id)
-        startid = (idi // n) * n
-        aesc = b'\x07\x00\x00\x00\x69\x00\x00\x00\x40\x01' + struct.pack("<B", startid) + b'\x00' + struct.pack("<B", startid + n) + b'\x00'
-        cipher = AES.new(self.key, AES.MODE_CBC, self.iv)
+        aesc = b'\x07\x00\x00\x00\x69\x00\x00\x00\x40\x01' + struct.pack("<B", startidx) + b'\x00' + struct.pack("<B", startidx + n) + b'\x00'
+        cipher = AES.new(key, AES.MODE_CBC, iv)
         aesc2 = cipher.encrypt(DevicePrimelan.pad(aesc))
         crc = DevicePrimelan.crc16(bytearray(out + aesc2))
         return pre + struct.pack("<H", crc) + out + aesc2
 
-    def pkt_state_get_parse(self, rv: bytes, startidx: int) -> Optional[CacheElement]:
-        exitv = None
+    @staticmethod
+    def pkt_state_get_process_response(rv: bytes, key: bytes, iv: bytes) -> Optional[bytes]:
         if rv and rv[0] == 0x50 and rv[1] == 0x53 and rv[12] == 0x50 and rv[13] == 0x50 and rv[4] == 0xEA and rv[8] == 0xEA and rv[18] == 0xEA and rv[16] == 0x01:
             crc = DevicePrimelan.crc16(bytearray(rv[16:]))
             if crc == struct.unpack("<H", rv[14:16])[0]:
-                cipher = AES.new(self.key, AES.MODE_CBC, self.iv)
+                cipher = AES.new(key, AES.MODE_CBC, iv)
                 decrypted = DevicePrimelan.unpad(cipher.decrypt(rv[22:]))
-                start = 18
                 _LOGGER.info(f"Decry: {decrypted.hex()}")
-                while start < len(decrypted):
-                    typeel = decrypted[start]
-                    state0 = state1 = None
-                    if typeel == 0x01 or typeel == 0x06:
-                        state0 = int(decrypted[start + 1])
-                        _LOGGER.info(f'Device {self.id} state: {state0}')
-                    elif typeel == 0x05:
-                        state0 = int(decrypted[start + 1])
-                        state1 = int(decrypted[start + 2])
-                        _LOGGER.info(f'Device {self.id} state: {state1}/{state0}')
-                    if state0 is not None:
-                        key = f'{self.host}:{self.port2}'
-                        cacheel = DevicePrimelan.STATE_CACHE.get(key, dict())
-                        DevicePrimelan.STATE_CACHE[key] = cacheel
-                        if startidx in cacheel:
-                            cacheel[startidx].update(state0, state1)
-                        else:
-                            cacheel[startidx] = CacheElement(startidx, typeel, state0, state1)
-                        _LOGGER.info(f'State of {startidx} is {state0}/{state1}: start is {start}[{len(decrypted)}]')
-                        if startidx == int(self.id):
-                            exitv = cacheel[startidx]
-                        else:
-                            event.EventManager.fire(
-                                eventname='ExtChangeState',
-                                hp=(self.host, self.port),
-                                mac=s2b(DevicePrimelan.generate_mac(self.host, startidx)),
-                                newstate=DevicePrimelan.cache_state_to_real_state(cacheel[startidx]))
-                    start += 10
-                    startidx += 1
+                return decrypted
+        return None
+
+    def pkt_state_get(self, n: int = 1) -> bytes:
+        return DevicePrimelan.pkt_state_get_c((int(self.id) // n) * n, n, self.key, self.iv)
+
+    def pkt_state_get_parse(self, rv: bytes, startidx: int) -> Optional[CacheElement]:
+        exitv = None
+        if (decrypted := DevicePrimelan.pkt_state_get_process_response(rv, self.key, self.iv)):
+            start = 18
+            while start < len(decrypted):
+                typeel = decrypted[start]
+                state0 = state1 = None
+                if typeel == 0x01 or typeel == 0x06:
+                    state0 = int(decrypted[start + 1])
+                    _LOGGER.info(f'Device {startidx} state: {state0}')
+                elif typeel == 0x05:
+                    state0 = int(decrypted[start + 1])
+                    state1 = int(decrypted[start + 2])
+                    _LOGGER.info(f'Device {startidx} state: {state1}/{state0}')
+                if state0 is not None:
+                    key = f'{self.host}:{self.port2}'
+                    cacheel = DevicePrimelan.STATE_CACHE.get(key, dict())
+                    DevicePrimelan.STATE_CACHE[key] = cacheel
+                    if startidx in cacheel:
+                        cacheel[startidx].update(state0, state1)
+                    else:
+                        cacheel[startidx] = CacheElement(startidx, typeel, state0, state1)
+                    _LOGGER.info(f'State of {startidx} is {state0}/{state1}: start is {start}[{len(decrypted)}]')
+                    if startidx == int(self.id):
+                        exitv = cacheel[startidx]
+                    else:
+                        event.EventManager.fire(
+                            eventname='ExtChangeState',
+                            hp=(self.host, self.port),
+                            mac=s2b(DevicePrimelan.generate_mac(self.host, startidx)),
+                            newstate=DevicePrimelan.cache_state_to_real_state(cacheel[startidx]))
+                start += 10
+                startidx += 1
         return exitv
 
     def change_state_http(self, pay, timeout):
@@ -379,14 +453,18 @@ class DevicePrimelan(Device):
         return 1 if r.status_code == 200 else r.status_code
 
     @staticmethod
+    def states_to_real_state(state0: int, state1: int) -> str:
+        if state1 is None:
+            return '1' if state0 else '0'
+        elif state1:
+            return f'{state0}'
+        else:
+            return '0'
+
+    @staticmethod
     def cache_state_to_real_state(ce: Optional[CacheElement]) -> str:
         if ce:
-            if ce.state1 is None:
-                return '1' if ce.state0 else '0'
-            elif ce.state1:
-                return f'{ce.state0}'
-            else:
-                return '0'
+            DevicePrimelan.states_to_real_state(ce.state0, ce.state1)
         else:
             return None
 
@@ -438,6 +516,14 @@ class DevicePrimelan(Device):
         else:
             return None
 
+    @staticmethod
+    def key_from_passw(passw: str) -> bytes:
+        return s2b(passw) + (b'\x00' * (16 - len(passw)))
+
+    @staticmethod
+    def iv_from_key(key: bytes) -> bytes:
+        return reduce(lambda x, y: x + struct.pack("<B", y[1] ^ y[0]), enumerate(key), b'')
+
     def __init__(self, hp=('', 0), mac='', root=None, name='', idv=0, typev=0, tk='', qindex=0, passw='', port2=6004, state=0):
         nn = DevicePrimelan.generate_name_nick(name)
         nick = nn[1]
@@ -464,9 +550,8 @@ class DevicePrimelan(Device):
             self.passw = passw
             self.port2 = port2
 
-        self.key = s2b(self.passw) + (b'\x00' * (16 - len(self.passw)))
-        self.iv = reduce(lambda x, y: x + struct.pack("<B",
-                                                      y[1] ^ y[0]), enumerate(self.key), b'')
+        self.key = DevicePrimelan.key_from_passw(self.passw)
+        self.iv = DevicePrimelan.iv_from_key(self.key)
 
     def to_dict(self):
         rv = Device.to_dict(self)
