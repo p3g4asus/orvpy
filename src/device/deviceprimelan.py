@@ -4,6 +4,7 @@ import struct
 import sys
 import time
 import traceback
+from typing import Dict, Optional
 from xml.dom import minidom
 
 import requests
@@ -22,11 +23,30 @@ if sys.version_info >= (3, 0):
 _LOGGER = init_logger(__name__, level=logging.DEBUG)
 
 
+class CacheElement(object):
+    def __init__(self, num: int, typeel: int, state0: Optional[int] = None, state1: Optional[int] = None) -> None:
+        self.num = num
+        self.type = typeel
+        self.update(state0, state1)
+
+    def update(self, state0: Optional[int] = None, state1: Optional[int] = None) -> None:
+        self.state0 = state0
+        self.state1 = state1
+        if self.state0 is not None:
+            self.time = time.time()
+        else:
+            self.time = 0
+
+    def age(self) -> float:
+        return time.time() - self.time
+
+
 class DevicePrimelan(Device):
     # 0: doppio pulsante
     # 2: On off slider
     # 1: slider 0-100
     TIMEOUT = 7
+    STATE_CACHE: Dict[str, Dict[int, CacheElement]] = dict()
 
     def process_asynch_state_change(self, state, device_connected=None):
         self.last_get = time.time()
@@ -261,25 +281,114 @@ class DevicePrimelan(Device):
                 o.extend([s for s in x])
         return ''.join(o)
 
-    def pkt_state(self, newstate):
+    @staticmethod
+    def pad(byte_array: bytearray, byte_count: int = 16):
+        """
+        pkcs5 padding
+        """
+        pad_len = byte_count - len(byte_array) % byte_count
+        return byte_array + (bytes([pad_len]) * pad_len)
+
+    @staticmethod
+    def unpad(s: bytearray):
+        return s[0:-s[-1]]
+
+    def invalidate_cache_element(self):
+        key = f'{self.host}:{self.port2}'
+        subkey = int(self.id)
+        if key in DevicePrimelan.STATE_CACHE and subkey in (cacheel := DevicePrimelan.STATE_CACHE[key]):
+            del cacheel[subkey]
+
+    def get_cache_element(self, max_age: Optional[float] = None) -> Optional[CacheElement]:
+        key = f'{self.host}:{self.port2}'
+        subkey = int(self.id)
+        if key in DevicePrimelan.STATE_CACHE and subkey in (cacheel := DevicePrimelan.STATE_CACHE[key]):
+            if not max_age or (chs := cacheel[subkey]).age() < max_age:
+                return chs
+            else:
+                del cacheel[subkey]
+                return None
+        else:
+            return None
+
+    def pkt_state_set(self, newstate):
         pre = b'\x50\x53\x00\x00\x1a\x00\x00\x00\x2a\x00\x00\x00\x50\x50'
         out = b'\x01\x00\x1a\x00\x00\x00'
-        if newstate < 0:
-            onoff = 0x4000
-            newstate = -newstate
-        else:
-            onoff = 0x30E0
+        onoff = 0xAE40
         aesc = b'\x08\x00\x00\x00\x69\x00\x00\x00' + struct.pack("<H", onoff) + struct.pack(
-            "<B", int(self.id)) + b'\x00' + struct.pack("<B", int(newstate)) + b'\x00\x02\x02'
+            "<B", int(self.id)) + b'\x00' + struct.pack("<B", int(newstate)) + b'\x00'
         cipher = AES.new(self.key, AES.MODE_CBC, self.iv)
-        aesc2 = cipher.encrypt(aesc)
+        aesc2 = cipher.encrypt(DevicePrimelan.pad(aesc))
         crc = DevicePrimelan.crc16(bytearray(out + aesc2))
         return pre + struct.pack("<H", crc) + out + aesc2
+
+    def pkt_state_get(self, n: int = 1):
+        pre = b'\x50\x53\x00\x00\x1a\x00\x00\x00\xea\x00\x00\x00\x50\x50'
+        out = b'\x01\x00\x1a\x00\x00\x00'
+        idi = int(self.id)
+        startid = (idi // n) * n
+        aesc = b'\x07\x00\x00\x00\x69\x00\x00\x00\x40\x01' + struct.pack("<B", startid) + b'\x00' + struct.pack("<B", startid + n) + b'\x00'
+        cipher = AES.new(self.key, AES.MODE_CBC, self.iv)
+        aesc2 = cipher.encrypt(DevicePrimelan.pad(aesc))
+        crc = DevicePrimelan.crc16(bytearray(out + aesc2))
+        return pre + struct.pack("<H", crc) + out + aesc2
+
+    def pkt_state_get_parse(self, rv: bytes, startidx: int) -> Optional[CacheElement]:
+        exitv = None
+        if rv and rv[0] == 0x50 and rv[1] == 0x53 and rv[12] == 0x50 and rv[13] == 0x50 and rv[4] == 0xEA and rv[8] == 0xEA and rv[18] == 0xEA and rv[16] == 0x01:
+            crc = DevicePrimelan.crc16(bytearray(rv[16:]))
+            if crc == struct.unpack("<H", rv[14:16])[0]:
+                cipher = AES.new(self.key, AES.MODE_CBC, self.iv)
+                decrypted = DevicePrimelan.unpad(cipher.decrypt(rv[22:]))
+                start = 18
+                _LOGGER.info(f"Decry: {decrypted.hex()}")
+                while start < len(decrypted):
+                    typeel = decrypted[start]
+                    state0 = state1 = None
+                    if typeel == 0x01 or typeel == 0x06:
+                        state0 = int(decrypted[start + 1])
+                        _LOGGER.info(f'Device {self.id} state: {state0}')
+                    elif typeel == 0x05:
+                        state0 = int(decrypted[start + 1])
+                        state1 = int(decrypted[start + 2])
+                        _LOGGER.info(f'Device {self.id} state: {state1}/{state0}')
+                    if state0 is not None:
+                        key = f'{self.host}:{self.port2}'
+                        cacheel = DevicePrimelan.STATE_CACHE.get(key, dict())
+                        DevicePrimelan.STATE_CACHE[key] = cacheel
+                        if startidx in cacheel:
+                            cacheel[startidx].update(state0, state1)
+                        else:
+                            cacheel[startidx] = CacheElement(startidx, typeel, state0, state1)
+                        _LOGGER.info(f'State of {startidx} is {state0}/{state1}: start is {start}[{len(decrypted)}]')
+                        if startidx == int(self.id):
+                            exitv = cacheel[startidx]
+                        else:
+                            event.EventManager.fire(
+                                eventname='ExtChangeState',
+                                hp=(self.host, self.port),
+                                mac=s2b(DevicePrimelan.generate_mac(self.host, startidx)),
+                                newstate=DevicePrimelan.cache_state_to_real_state(cacheel[startidx]))
+                    start += 10
+                    startidx += 1
+        return exitv
 
     def change_state_http(self, pay, timeout):
         r = requests.post('http://{}:{}/cgi-bin/web.cgi'.format(self.host, self.port),
                           data={'tk': self.tk, 'qindex': self.qindex, 'mod': 'do_cmd', 'par': self.id, 'act': pay}, timeout=timeout)
         return 1 if r.status_code == 200 else r.status_code
+
+    @staticmethod
+    def cache_state_to_real_state(ce: Optional[CacheElement]) -> str:
+        if ce:
+            if ce.state1 is None:
+                return '1' if ce.state0 else '0'
+            elif ce.state1:
+                return f'{ce.state0}'
+            else:
+                return '0'
+        else:
+            return None
 
     @staticmethod
     def http_state_to_real_state(d):
@@ -309,9 +418,25 @@ class DevicePrimelan(Device):
             rv = self.state
         return rv
 
+    def get_state_tcp(self, timeout):
+        if not (ce := self.get_cache_element(10)):
+            t = TCPClient(timeout)
+            idi = int(self.id)
+            byvals = self.pkt_state_get(20)
+            _LOGGER.info(f'Get state for id {self.id} -> {byvals.hex()}')
+            if (rv := t.send_packet((self.host, self.port2), byvals)) and (ce := self.pkt_state_get_parse(rv, (idi // 20) * 20)):
+                self.last_get = time.time()
+        return DevicePrimelan.cache_state_to_real_state(ce)
+
     def change_state_tcp(self, state, timeout):
         t = TCPClient(timeout)
-        return 1 if t.send_packet((self.host, self.port2), self.pkt_state(state)) > 0 else None
+        byvals = self.pkt_state_set(state)
+        _LOGGER.info(f'Set state for id {self.id} -> {byvals.hex()}')
+        if t.send_packet((self.host, self.port2), byvals):
+            self.invalidate_cache_element()
+            return 1
+        else:
+            return None
 
     def __init__(self, hp=('', 0), mac='', root=None, name='', idv=0, typev=0, tk='', qindex=0, passw='', port2=6004, state=0):
         nn = DevicePrimelan.generate_name_nick(name)
@@ -369,6 +494,7 @@ class DevicePrimelan(Device):
             try:
                 state = int(pay)
                 self.last_get = -1
+                _LOGGER.info(f'States {state} -> {self.state}')
                 if state != int(self.state):
                     rv = self.change_state_tcp(state, timeout)
                 else:
@@ -379,7 +505,7 @@ class DevicePrimelan(Device):
             return action.exec_handler(rv, self.state)
         elif isinstance(action, ActionStatechange):
             try:
-                rv = self.get_state_http(timeout)
+                rv = self.get_state_tcp(timeout)
                 if rv is not None:
                     if self.state != rv:
                         st = int(self.state)

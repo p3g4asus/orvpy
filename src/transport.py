@@ -150,11 +150,12 @@ class TCPClient(EthSender):
             sock.settimeout(self.timeout)
             sock.connect(addr)
             sock.sendall(bytearray(packet))
+            resp = sock.recv(1024)
             sock.close()
-            return len(packet)
+            return resp
         except:  # noqa: E722
             _LOGGER.warning(f"{traceback.format_exc()}")
-            return -1
+            return None
 
 
 class HTTPServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
