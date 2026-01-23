@@ -464,7 +464,7 @@ class DevicePrimelan(Device):
     @staticmethod
     def cache_state_to_real_state(ce: Optional[CacheElement]) -> str:
         if ce:
-            DevicePrimelan.states_to_real_state(ce.state0, ce.state1)
+            return DevicePrimelan.states_to_real_state(ce.state0, ce.state1)
         else:
             return None
 
